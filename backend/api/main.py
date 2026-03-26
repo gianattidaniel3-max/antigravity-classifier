@@ -32,6 +32,11 @@ app.include_router(documents_router, prefix="/api")
 app.include_router(analysis_router, prefix="/api")
 app.include_router(stats_router, prefix="/api")
 
+@app.on_event("startup")
+def on_startup():
+    from backend.db.init_db import init_db
+    init_db()
+
 @app.get("/health")
 async def health_check():
     """Simple health check endpoint."""

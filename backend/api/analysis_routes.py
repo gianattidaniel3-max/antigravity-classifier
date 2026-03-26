@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException
-from backend.auth.deps import get_current_user
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
@@ -28,7 +27,7 @@ _NLP_OPS = (
 )
 
 
-router = APIRouter(dependencies=[Depends(get_current_user)])
+router = APIRouter()
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -77,7 +76,7 @@ def list_cases(db: Session = Depends(get_db)):
 
 
 @router.post("/cases")
-def create_case(payload: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_case(payload: dict, db: Session = Depends(get_db)):
     name = payload.get("name", "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="name required")
@@ -86,7 +85,7 @@ def create_case(payload: dict, db: Session = Depends(get_db), current_user: User
         name=name,
         description=payload.get("description"),
         client_name=payload.get("client_name"),
-        created_by=current_user.id
+        created_by=None
     )
     db.add(case)
     db.commit()

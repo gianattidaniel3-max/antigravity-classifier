@@ -6,7 +6,6 @@ import {
 import axios from 'axios';
 import TaxonomyPanel from './TaxonomyPanel';
 import CasesView from './CasesView';
-import LoginPage from './LoginPage';
 import DashboardView from './DashboardView';
 
 const API_BASE = 'http://localhost:8000/api';
@@ -150,48 +149,9 @@ function FieldRow({ label, value, editable, onChange }: {
 type View = 'classifier' | 'cases' | 'taxonomy' | 'dashboard';
 
 function App() {
-  // ── Auth ────────────────────────────────────────────────────────────────────
-  const [token, setToken]   = useState<string | null>(() => localStorage.getItem('eco_token'));
-  const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('eco_email'));
-
-  // Keep axios Authorization header in sync with the token
-  useEffect(() => {
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    } else {
-      delete axios.defaults.headers.common['Authorization'];
-    }
-  }, [token]);
-
-  // Redirect to login on any 401
-  useEffect(() => {
-    const id = axios.interceptors.response.use(
-      r => r,
-      err => {
-        if (err.response?.status === 401) handleLogout();
-        return Promise.reject(err);
-      }
-    );
-    return () => axios.interceptors.response.eject(id);
-  }, []);
-
-  function handleLogin(newToken: string, email: string) {
-    localStorage.setItem('eco_token', newToken);
-    localStorage.setItem('eco_email', email);
-    axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-    setToken(newToken);
-    setUserEmail(email);
-  }
-
-  function handleLogout() {
-    localStorage.removeItem('eco_token');
-    localStorage.removeItem('eco_email');
-    delete axios.defaults.headers.common['Authorization'];
-    setToken(null);
-    setUserEmail(null);
-  }
-
-  if (!token) return <LoginPage onLogin={handleLogin} />;
+  const token: string | null = null;
+  const userEmail: string | null = null;
+  function handleLogout() {}
 
   // ── App state ────────────────────────────────────────────────────────────────
   const [docId, setDocId]       = useState<string | null>(null);

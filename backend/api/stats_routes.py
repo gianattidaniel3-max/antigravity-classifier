@@ -19,9 +19,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
 from backend.db.models import Document, DocumentStatus, Case, CaseStatus, VerificationLog, User
-from backend.auth.deps import get_current_user
-
-router = APIRouter(dependencies=[Depends(get_current_user)])
+router = APIRouter()
 
 
 # ─────────────────────────────────────────────────────────────────

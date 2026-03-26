@@ -6,7 +6,6 @@ from backend.db.session import get_db
 from backend.db.models import Document, DocumentStatus, User, VerificationLog
 from backend.nlp.storage import client as minio_client, ensure_buckets
 from backend.workers.tasks import process_document
-from backend.auth.deps import get_current_user
 import backend.nlp.taxonomy as taxonomy_store
 import backend.nlp.field_schema_store as field_schema_store
 import uuid
@@ -35,7 +34,7 @@ except Exception:
         def hget(self, key, field): return self.store.get(key, {}).get(field)
     _redis = DummyRedis()
 
-router = APIRouter(dependencies=[Depends(get_current_user)])
+router = APIRouter()
 
 @router.post("/upload")
 async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -159,7 +158,6 @@ def verify_document(
     doc_id: str,
     payload: dict,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """
     Expected payload:
@@ -199,7 +197,7 @@ def verify_document(
     # Audit log
     log = VerificationLog(
         document_id    = doc_id,
-        user_id        = current_user.id,
+        user_id        = None,
         original_label = original_label,
         final_label    = corrected_label,
         label_changed  = (original_label != corrected_label),

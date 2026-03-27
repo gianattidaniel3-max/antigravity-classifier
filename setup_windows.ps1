@@ -72,6 +72,7 @@ if (!(Test-Path "backend\venv")) {
 Write-Host "Installazione dipendenze Python..."
 & "backend\venv\Scripts\python.exe" -m pip install --upgrade pip
 & "backend\venv\Scripts\python.exe" -m pip install -r backend\requirements_windows.txt
+& "backend\venv\Scripts\python.exe" -m pip install uvicorn==0.27.0
 
 # 6. Configurazione Frontend
 Write-Host "`n--- Configurazione Frontend ---" -ForegroundColor Cyan

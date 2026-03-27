@@ -186,10 +186,13 @@ function App() {
         setApiKeyError(r.data.error || 'Errore');
       }
     } catch (err: any) {
-      // If it's a network error during save, it might just be the server reloading.
-      // We check if it's already set after a short delay.
-      setApiKeyError('Connessione persa (il server si sta riavviando...).');
-      setTimeout(fetchSettings, 3000);
+      if (err.code === 'ECONNABORTED' || err.message?.includes('Network Error')) {
+        // This might just be a brief flicker. If we're here, it's possible the save worked.
+        // We check the status after a small delay.
+        setTimeout(fetchSettings, 2000);
+      } else {
+        setApiKeyError('Errore di connessione. Verifica che il server sia attivo.');
+      }
     }
     finally { setApiKeySaving(false); }
   };

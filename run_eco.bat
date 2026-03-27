@@ -28,7 +28,7 @@ if not exist "frontend\node_modules" (
 
 :: 3. Start Backend in background
 echo [*] Avvio Backend (ECO Engine)...
-start "ECO_BACKEND_SERVICE" /min cmd /c "cd /d "%BASEDIR%" && backend\venv\Scripts\python -m uvicorn backend.api.main:app --host 0.0.0.0 --port 8000"
+start "ECO_BACKEND_SERVICE" /min cmd /c "cd /d "%BASEDIR%" && backend\venv\Scripts\python -m uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --no-reload"
 
 :: 4. Start Frontend
 echo [*] Avvio Interfaccia...

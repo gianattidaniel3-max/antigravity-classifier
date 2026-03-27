@@ -28,19 +28,40 @@ if (!(Get-Command node -ErrorAction SilentlyContinue)) {
     Write-Host "OK Node.js trovato." -ForegroundColor Green
 }
 
-# 3. Verifica/Installazione Ollama
-if (!(Get-Command ollama -ErrorAction SilentlyContinue)) {
-    Write-Host "Ollama non trovato. Installazione in corso via winget..." -ForegroundColor Yellow
-    winget install ollama.ollama --silent --accept-package-agreements --accept-source-agreements
+# 3. Verifica/Installazione Tesseract OCR
+if (!(Get-Command tesseract -ErrorAction SilentlyContinue)) {
+    Write-Host "Tesseract non trovato. Installazione in corso via winget..." -ForegroundColor Yellow
+    winget install UB-Mannheim.TesseractOCR --silent --accept-package-agreements --accept-source-agreements
     Refresh-Path
 } else {
-    Write-Host "OK Ollama trovato." -ForegroundColor Green
+    Write-Host "OK Tesseract trovato." -ForegroundColor Green
+}
+
+# 4. Verifica/Installazione Poppler (necessario per pdf2image)
+$popplerPath = "C:\Program Files\poppler\Library\bin"
+if (!(Test-Path $popplerPath)) {
+    Write-Host "Poppler non trovato. Download in corso..." -ForegroundColor Yellow
+    $popplerUrl = "https://github.com/oschwartz10612/poppler-windows/releases/download/v24.02.0-0/Release-24.02.0-0.zip"
+    $popplerZip = "$env:TEMP\poppler.zip"
+    $popplerDest = "C:\Program Files\poppler"
+    Invoke-WebRequest -Uri $popplerUrl -OutFile $popplerZip
+    Expand-Archive -Path $popplerZip -DestinationPath $popplerDest -Force
+    Remove-Item $popplerZip
+    # Add to system PATH
+    $currentPath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+    if ($currentPath -notlike "*$popplerPath*") {
+        [System.Environment]::SetEnvironmentVariable("Path", "$currentPath;$popplerPath", "Machine")
+    }
+    Refresh-Path
+    Write-Host "OK Poppler installato." -ForegroundColor Green
+} else {
+    Write-Host "OK Poppler trovato." -ForegroundColor Green
 }
 
 # Refresh finale per sicurezza
 Refresh-Path
 
-# 4. Configurazione Backend
+# 5. Configurazione Backend
 Write-Host "`n--- Configurazione Backend ---" -ForegroundColor Cyan
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $scriptDir
@@ -49,18 +70,15 @@ if (!(Test-Path "backend\venv")) {
     python -m venv backend\venv
 }
 Write-Host "Installazione dipendenze Python..."
-& "backend\venv\Scripts\python.exe" -m pip install -r backend\requirements.txt
+& "backend\venv\Scripts\python.exe" -m pip install --upgrade pip
+& "backend\venv\Scripts\python.exe" -m pip install -r backend\requirements_windows.txt
 
-# 5. Configurazione Frontend
+# 6. Configurazione Frontend
 Write-Host "`n--- Configurazione Frontend ---" -ForegroundColor Cyan
 Write-Host "Installazione dipendenze Node.js..."
 Set-Location "$scriptDir\frontend"
 npm install
 Set-Location $scriptDir
-
-# 6. Scaricamento Modello AI
-Write-Host "`n--- Configurazione AI ---" -ForegroundColor Cyan
-ollama pull llama3.2:3b
 
 Write-Host "`nConfigurazione completata!" -ForegroundColor Green
 Write-Host "Ora puoi avviare l'applicazione usando 'run_eco.bat'" -ForegroundColor Cyan

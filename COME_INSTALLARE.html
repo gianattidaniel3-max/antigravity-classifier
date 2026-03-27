@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ECO — Guida all'Installazione</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f2f0eb;
+      color: #1a1a1a;
+      padding: 2rem 1rem;
+    }
+    .container {
+      max-width: 740px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      background: #2d6a4f;
+      color: white;
+      border-radius: 8px;
+      padding: 2rem 2.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .header h1 { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; }
+    .header p  { margin-top: 0.4rem; opacity: 0.8; font-size: 0.95rem; }
+
+    /* Card */
+    .card {
+      background: white;
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 8px;
+      padding: 1.5rem 2rem;
+      margin-bottom: 1.2rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .card h2 {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #9ca3af;
+      margin-bottom: 1rem;
+    }
+
+    /* Steps */
+    .steps { list-style: none; display: flex; flex-direction: column; gap: 0.85rem; }
+    .steps li {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+    .step-num {
+      min-width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #2d6a4f;
+      color: white;
+      font-weight: 800;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step-body { flex: 1; }
+    .step-body strong { display: block; font-size: 0.95rem; font-weight: 700; margin-bottom: 0.2rem; }
+    .step-body p  { font-size: 0.88rem; color: #52525b; line-height: 1.5; }
+
+    /* Code / command */
+    code {
+      background: #f4f4f5;
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 4px;
+      padding: 0.15rem 0.45rem;
+      font-family: "Cascadia Code", "Consolas", monospace;
+      font-size: 0.82rem;
+      color: #2d6a4f;
+    }
+
+    /* Warning / info boxes */
+    .box {
+      border-radius: 6px;
+      padding: 0.85rem 1.1rem;
+      font-size: 0.88rem;
+      line-height: 1.55;
+      margin-top: 0.6rem;
+    }
+    .box-yellow {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      color: #78350f;
+    }
+    .box-green {
+      background: #edf7f1;
+      border: 1px solid #a7d3bc;
+      color: #1e4d38;
+    }
+    .box-red {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #7f1d1d;
+    }
+    .box b { display: block; margin-bottom: 0.2rem; }
+
+    /* Req list */
+    .req-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+      margin-top: 0.2rem;
+    }
+    .req-item {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.55rem 0.75rem;
+      background: #fafaf8;
+      border: 1px solid rgba(0,0,0,0.07);
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+    .req-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #2d6a4f;
+      flex-shrink: 0;
+    }
+
+    /* FAQ */
+    .faq { display: flex; flex-direction: column; gap: 0.9rem; }
+    .faq-item { border-left: 3px solid #a7d3bc; padding-left: 0.9rem; }
+    .faq-item strong { font-size: 0.9rem; display: block; margin-bottom: 0.25rem; }
+    .faq-item p { font-size: 0.85rem; color: #52525b; line-height: 1.5; }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      font-size: 0.78rem;
+      color: #9ca3af;
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(0,0,0,0.07);
+    }
+
+    @media (max-width: 520px) {
+      .req-grid { grid-template-columns: 1fr; }
+      .header { padding: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>ECO — Classificatore di Documenti</h1>
+    <p>Guida all'installazione per Windows &nbsp;·&nbsp; Leggi tutto prima di iniziare</p>
+  </div>
+
+  <!-- COSA SERVE -->
+  <div class="card">
+    <h2>Cosa serve prima di iniziare</h2>
+    <div class="req-grid">
+      <div class="req-item"><div class="req-dot"></div> Windows 10 o Windows 11</div>
+      <div class="req-item"><div class="req-dot"></div> Connessione internet attiva</div>
+      <div class="req-item"><div class="req-dot"></div> Almeno 4 GB di spazio libero</div>
+      <div class="req-item"><div class="req-dot"></div> Credenziali amministratore</div>
+    </div>
+    <div class="box box-yellow" style="margin-top:1rem;">
+      <b>&#9888; Importante</b>
+      Lo script di installazione deve essere eseguito come <strong>Amministratore</strong>.
+      Se non sei sicuro di avere i permessi, chiedi al responsabile IT prima di procedere.
+    </div>
+  </div>
+
+  <!-- INSTALLAZIONE -->
+  <div class="card">
+    <h2>Installazione — passo per passo</h2>
+    <ol class="steps">
+
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <strong>Apri PowerShell come Amministratore</strong>
+          <p>Clicca sul pulsante <strong>Start</strong> di Windows, digita <code>PowerShell</code>,
+             poi fai <strong>clic destro</strong> su "Windows PowerShell" e scegli
+             <strong>"Esegui come amministratore"</strong>.</p>
+        </div>
+      </li>
+
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <strong>Raggiungi la cartella di ECO</strong>
+          <p>Nella finestra di PowerShell, digita il comando seguente (adatta il percorso
+             a dove hai salvato la cartella ECO) e premi <strong>Invio</strong>:</p>
+          <p style="margin-top:0.5rem;"><code>cd "C:\Users\TuoNome\Desktop\ECO"</code></p>
+        </div>
+      </li>
+
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <strong>Abilita l'esecuzione degli script (una sola volta)</strong>
+          <p>Copia e incolla questo comando, poi premi <strong>Invio</strong>.
+             Quando chiede conferma, digita <code>S</code> e premi Invio.</p>
+          <p style="margin-top:0.5rem;"><code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code></p>
+        </div>
+      </li>
+
+      <li>
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <strong>Avvia lo script di installazione</strong>
+          <p>Copia e incolla questo comando e premi <strong>Invio</strong>:</p>
+          <p style="margin-top:0.5rem;"><code>.\setup_windows.ps1</code></p>
+          <div class="box box-green" style="margin-top:0.7rem;">
+            Lo script installerà automaticamente tutto il necessario:
+            Python, Node.js, Tesseract OCR e Poppler.
+            <strong>Ci vorranno circa 5–10 minuti</strong>. Non chiudere la finestra.
+          </div>
+        </div>
+      </li>
+
+      <li>
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <strong>Avvio completato — comparirà il messaggio verde</strong>
+          <p>Quando vedi scritto <em>"Configurazione completata!"</em> l'installazione è andata a buon fine.
+             Puoi chiudere PowerShell.</p>
+        </div>
+      </li>
+
+    </ol>
+  </div>
+
+  <!-- AVVIO QUOTIDIANO -->
+  <div class="card">
+    <h2>Come avviare ECO ogni giorno</h2>
+    <ol class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <strong>Fai doppio clic su <code>run_eco.bat</code></strong>
+          <p>Si troveranno nella cartella principale di ECO. Si apriranno due finestre nere
+             (backend e frontend): <strong>non chiuderle</strong>.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <strong>Apri il browser e vai su <code>http://localhost:5173</code></strong>
+          <p>ECO è pronto per essere usato. La pagina si aprirà direttamente sulla schermata di caricamento documenti.</p>
+        </div>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <strong>Per chiudere ECO</strong>
+          <p>Chiudi entrambe le finestre nere oppure premi <code>Ctrl + C</code> dentro ciascuna.</p>
+        </div>
+      </li>
+    </ol>
+  </div>
+
+  <!-- DOMANDE FREQUENTI -->
+  <div class="card">
+    <h2>Problemi comuni</h2>
+    <div class="faq">
+
+      <div class="faq-item">
+        <strong>Lo script si apre come un documento di testo invece di eseguirsi</strong>
+        <p>Non fare doppio clic su <code>setup_windows.ps1</code>. Devi aprire PowerShell come Amministratore
+           e digitare <code>.\setup_windows.ps1</code> come spiegato al punto 4.</p>
+      </div>
+
+      <div class="faq-item">
+        <strong>Lo script si blocca dopo "Installazione in corso..."</strong>
+        <p>È normale — le prime installazioni (Python, Node.js) richiedono qualche minuto.
+           Aspetta almeno 5 minuti prima di preoccuparti. Controlla che la connessione internet funzioni.</p>
+      </div>
+
+      <div class="faq-item">
+        <strong>Errore "Impossibile caricare il file ... non è consentito"</strong>
+        <p>Non hai eseguito il passaggio 3 (abilitazione script). Riapri PowerShell come Amministratore
+           ed esegui di nuovo <code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code>.</p>
+      </div>
+
+      <div class="faq-item">
+        <strong>Il sito non si apre sul browser</strong>
+        <p>Assicurati che entrambe le finestre nere siano aperte (backend + frontend).
+           Se una delle due si è chiusa da sola, riavvia <code>run_eco.bat</code>.
+           Attendi almeno 10 secondi prima di aprire il browser.</p>
+      </div>
+
+      <div class="faq-item">
+        <strong>L'upload del documento fallisce</strong>
+        <p>Verifica che la finestra del backend sia ancora aperta e che non mostri errori rossi.
+           Se c'è un errore, richiudi tutto e rilancia <code>run_eco.bat</code>.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- NOTE FINALI -->
+  <div class="box box-green" style="margin-bottom:1.2rem; padding: 1rem 1.25rem; border-radius:8px;">
+    <b>&#10003; ECO funziona completamente offline</b>
+    Una volta installato, ECO non ha bisogno di internet per classificare i documenti.
+    Tutti i dati rimangono sul tuo computer.
+  </div>
+
+  <div class="footer">
+    ECO — Classificatore di Documenti Legali &nbsp;·&nbsp; Per assistenza contatta il tuo referente tecnico
+  </div>
+
+</div>
+</body>
+</html>

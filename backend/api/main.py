@@ -10,6 +10,7 @@ from backend.api.routes import router as documents_router
 from backend.api.analysis_routes import router as analysis_router
 from backend.api.auth_routes import router as auth_router
 from backend.api.stats_routes import router as stats_router
+from backend.api.settings_routes import router as settings_router
 
 app = FastAPI(
     title="File Classifier API",
@@ -31,6 +32,7 @@ app.include_router(auth_router, prefix="/api")
 app.include_router(documents_router, prefix="/api")
 app.include_router(analysis_router, prefix="/api")
 app.include_router(stats_router, prefix="/api")
+app.include_router(settings_router, prefix="/api")
 
 @app.on_event("startup")
 def on_startup():

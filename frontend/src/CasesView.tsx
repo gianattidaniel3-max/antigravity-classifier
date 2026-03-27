@@ -3,7 +3,7 @@ import axios from 'axios';
 import {
   Plus, Trash2, Play, Download, ChevronRight,
   FolderOpen, FileText, X, AlertTriangle, CheckCircle2,
-  Sparkles, Loader, Table2, List, FileSpreadsheet, FileType2,
+  Sparkles, Loader, Table2, List, Layers, FileSpreadsheet, FileType2,
   PanelLeftClose, PanelRightClose, PanelLeft, PanelRight,
 } from 'lucide-react';
 
@@ -105,7 +105,8 @@ export default function CasesView() {
   const [pdfViewer, setPdfViewer] = useState<{ url: string; name: string } | null>(null);
 
   // Dataset view mode
-  const [viewMode, setViewMode] = useState<'list' | 'table'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'table' | 'categorie'>('list');
+  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
 
   // New case form
   const [newName, setNewName]     = useState('');
@@ -127,9 +128,9 @@ export default function CasesView() {
   const [leftPanelVisible, setLeftPanelVisible]   = useState(true);
   const [rightPanelVisible, setRightPanelVisible] = useState(true);
 
-  // Auto-hide right panel when in table mode
+  // Auto-hide right panel when in table or categorie mode
   useEffect(() => {
-    if (viewMode === 'table') {
+    if (viewMode === 'table' || viewMode === 'categorie') {
       setRightPanelVisible(false);
     } else {
       setRightPanelVisible(true);
@@ -560,6 +561,15 @@ export default function CasesView() {
                     style={{ background: viewMode === 'table' ? '#edf7f1' : 'none', border: `1px solid ${viewMode === 'table' ? '#a7d3bc' : 'rgba(0,0,0,0.1)'}`, padding: '0.28rem 0.45rem', borderRadius: '4px', cursor: 'pointer', color: viewMode === 'table' ? '#2d6a4f' : '#a1a1aa', display: 'flex' }} title="Vista tabella">
                     <Table2 size={13} />
                   </button>
+                  <button onClick={() => {
+                    setViewMode('categorie');
+                    // expand all categories by default
+                    const cats = [...new Set((selectedCase?.documents || []).map(d => d.extracted_category || 'Senza categoria'))];
+                    setOpenCategories(new Set(cats));
+                  }}
+                    style={{ background: viewMode === 'categorie' ? '#edf7f1' : 'none', border: `1px solid ${viewMode === 'categorie' ? '#a7d3bc' : 'rgba(0,0,0,0.1)'}`, padding: '0.28rem 0.45rem', borderRadius: '4px', cursor: 'pointer', color: viewMode === 'categorie' ? '#2d6a4f' : '#a1a1aa', display: 'flex' }} title="Vista per categorie">
+                    <Layers size={13} />
+                  </button>
 
                   <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.1)', margin: '0 0.1rem' }} />
 
@@ -611,6 +621,94 @@ export default function CasesView() {
                     </div>
                   ))}
                 </div>
+              ) : viewMode === 'categorie' ? (
+                /* ── CATEGORIE VIEW ── */
+                (() => {
+                  const docs = selectedCase.documents || [];
+                  // Group by category
+                  const grouped: Record<string, Doc[]> = {};
+                  docs.forEach(doc => {
+                    const cat = doc.extracted_category || 'Senza categoria';
+                    if (!grouped[cat]) grouped[cat] = [];
+                    grouped[cat].push(doc);
+                  });
+                  const categories = Object.keys(grouped).sort((a, b) => {
+                    if (a === 'Senza categoria') return 1;
+                    if (b === 'Senza categoria') return -1;
+                    return grouped[b].length - grouped[a].length;
+                  });
+                  // Color palette per category index
+                  const palette = [
+                    { bg: '#edf7f1', border: '#a7d3bc', accent: '#2d6a4f', text: '#1e4d38' },
+                    { bg: '#eff6ff', border: '#bfdbfe', accent: '#2563eb', text: '#1e3a8a' },
+                    { bg: '#fefce8', border: '#fde68a', accent: '#d97706', text: '#78350f' },
+                    { bg: '#fdf2f8', border: '#f9a8d4', accent: '#db2777', text: '#831843' },
+                    { bg: '#f0fdf4', border: '#86efac', accent: '#16a34a', text: '#14532d' },
+                    { bg: '#f5f3ff', border: '#c4b5fd', accent: '#7c3aed', text: '#4c1d95' },
+                    { bg: '#fff7ed', border: '#fdba74', accent: '#ea580c', text: '#7c2d12' },
+                    { bg: '#f0f9ff', border: '#7dd3fc', accent: '#0284c7', text: '#0c4a6e' },
+                  ];
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                      {categories.map((cat, idx) => {
+                        const catDocs = grouped[cat];
+                        const isOpen = openCategories.has(cat);
+                        const c = palette[idx % palette.length];
+                        return (
+                          <div key={cat} style={{ border: `1px solid ${c.border}`, borderRadius: '6px', overflow: 'hidden' }}>
+                            {/* Category header */}
+                            <button
+                              onClick={() => setOpenCategories(prev => {
+                                const next = new Set(prev);
+                                if (next.has(cat)) next.delete(cat); else next.add(cat);
+                                return next;
+                              })}
+                              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.85rem', background: c.bg, border: 'none', cursor: 'pointer', textAlign: 'left', gap: '0.6rem' }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                                <Layers size={13} color={c.accent} style={{ flexShrink: 0 }} />
+                                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: c.text, textTransform: 'capitalize' }}>{cat}</span>
+                                <span style={{ fontSize: '0.68rem', background: c.accent, color: 'white', borderRadius: '10px', padding: '1px 7px', fontWeight: 700 }}>{catDocs.length}</span>
+                              </div>
+                              <ChevronRight size={14} color={c.accent} style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.18s', flexShrink: 0 }} />
+                            </button>
+                            {/* Documents list */}
+                            {isOpen && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', padding: '0.5rem 0.85rem 0.7rem' }}>
+                                {catDocs.map(doc => (
+                                  <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.45rem 0.65rem', background: 'white', borderRadius: '4px', border: `1px solid ${c.border}`, borderLeft: `3px solid ${c.accent}` }}>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <button onClick={() => openPdf(doc)}
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0, width: '100%' }}>
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: c.accent, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', textDecoration: 'underline', textDecorationColor: `${c.accent}44` }}>
+                                          {doc.filename}
+                                        </span>
+                                      </button>
+                                      {doc.extracted_label && (
+                                        <span style={{ fontSize: '0.68rem', color: c.text, fontWeight: 500, opacity: 0.8 }}>{doc.extracted_label}</span>
+                                      )}
+                                      {doc.extracted_date && (
+                                        <span style={{ fontSize: '0.68rem', color: '#9ca3af', marginLeft: '0.5rem' }}>{doc.extracted_date}</span>
+                                      )}
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
+                                      {doc.llm_classification_match === false && <AlertTriangle size={12} color="#d97706" />}
+                                      {doc.human_verified && <CheckCircle2 size={12} color="#10b981" />}
+                                      <button onClick={() => unassignDoc(doc.id)}
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cbd5e1', padding: 0 }} title="Rimuovi">
+                                        <X size={12} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()
               ) : (
                 /* ── TABLE VIEW ── */
                 <div style={{ overflowX: 'auto' }}>

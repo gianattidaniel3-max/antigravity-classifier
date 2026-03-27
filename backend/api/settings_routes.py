@@ -58,11 +58,25 @@ def get_settings():
 
 
 @router.post("/settings")
-def save_settings(payload: dict):
+async def save_settings(payload: dict):
     key = (payload.get("openai_api_key") or "").strip()
     if not key:
         return {"ok": False, "error": "La chiave non può essere vuota"}
     if not key.startswith("sk-"):
         return {"ok": False, "error": "La chiave deve iniziare con sk-"}
-    _write_env_key("OPENAI_API_KEY", key)
+    
+    # Update in-memory immediately so current session works
+    os.environ["OPENAI_API_KEY"] = key
+    
+    # We return success FIRST, then the server might reload if .env changes.
+    # On Windows, we'll wait a tiny bit to ensure the response is flushed.
+    import asyncio
+    
+    async def _delayed_write():
+        await asyncio.sleep(0.5)
+        _write_env_key("OPENAI_API_KEY", key)
+        
+    # Schedule the write to happen after the response is likely sent
+    asyncio.create_task(_delayed_write())
+    
     return {"ok": True}

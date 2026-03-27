@@ -172,15 +172,25 @@ function App() {
   const saveApiKey = async () => {
     setApiKeySaving(true); setApiKeyError(''); setApiKeySuccess(false);
     try {
-      const r = await axios.post(`${API_BASE}/settings`, { openai_api_key: apiKeyInput });
+      // Increase timeout to 10s for this sensitive operation
+      const r = await axios.post(`${API_BASE}/settings`, 
+        { openai_api_key: apiKeyInput },
+        { timeout: 10000 }
+      );
       if (r.data.ok) {
         setApiKeySuccess(true); setApiKeyInput('');
-        await fetchSettings();
+        // Wait a bit before fetching to allow potential server reload
+        setTimeout(fetchSettings, 1500);
         setTimeout(() => setApiKeySuccess(false), 3000);
       } else {
         setApiKeyError(r.data.error || 'Errore');
       }
-    } catch { setApiKeyError('Errore di connessione'); }
+    } catch (err: any) {
+      // If it's a network error during save, it might just be the server reloading.
+      // We check if it's already set after a short delay.
+      setApiKeyError('Connessione persa (il server si sta riavviando...).');
+      setTimeout(fetchSettings, 3000);
+    }
     finally { setApiKeySaving(false); }
   };
 

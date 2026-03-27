@@ -49,7 +49,15 @@ class LocalStorage(StorageClient):
         path = self._path(bucket, object_name)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "wb") as f:
-            shutil.copyfileobj(data, f)
+            if hasattr(data, "read"):
+                # Use a loop to avoid loading entire file into memory at once
+                while True:
+                    chunk = data.read(1024 * 64)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+            else:
+                f.write(data)
 
     def get_object(self, bucket, object_name):
         path = self._path(bucket, object_name)

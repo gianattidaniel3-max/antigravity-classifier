@@ -40,18 +40,25 @@ try:
     )
 except Exception:
     class DummyRedis:
-        def __init__(self): self.store = {}
+        def __init__(self): 
+            self.store = {}
+            print("WARNING: Using Dummy Redis (Local Mode)")
+        def ping(self): 
+            return True
         def hset(self, key, mapping=None, **kwargs):
             if key not in self.store: self.store[key] = {}
             if mapping: self.store[key].update(mapping)
             self.store[key].update(kwargs)
+            return 1
         def hgetall(self, key): return self.store.get(key, {})
         def hincrby(self, key, field, amount=1):
             if key not in self.store: self.store[key] = {}
             val = int(self.store[key].get(field, 0)) + amount
             self.store[key][field] = str(val)
+            return val
         def expire(self, key, time): pass
         def hget(self, key, field): return self.store.get(key, {}).get(field)
+    
     _redis = DummyRedis()
     
     class DummyCelery:
@@ -59,11 +66,13 @@ except Exception:
             def decorator(f):
                 def delay(*args, **kwargs):
                     import threading
+                    print(f"DEBUG: Running task {f.__name__} in background thread")
                     # Create a dummy 'self' that has a 'retry' method for compatibility
                     class TaskSelf:
-                        def retry(self, *args, **kwargs): pass
+                        def retry(self, *args, **kwargs): 
+                            print(f"DEBUG: Task {f.__name__} requested retry")
                     t = threading.Thread(target=f, args=(TaskSelf(), *args), kwargs=kwargs)
-                    t.daemon = True # Non-blocking on exit
+                    t.daemon = True 
                     t.start()
                 f.delay = delay
                 return f

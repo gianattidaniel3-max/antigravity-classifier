@@ -59,24 +59,32 @@ def get_settings():
 
 @router.post("/settings")
 async def save_settings(payload: dict):
+    """
+    Saves the API key to .env synchronously.
+    Since --no-reload is used in production, this won't kill the connection.
+    """
     key = (payload.get("openai_api_key") or "").strip()
     if not key:
         return {"ok": False, "error": "La chiave non può essere vuota"}
     if not key.startswith("sk-"):
         return {"ok": False, "error": "La chiave deve iniziare con sk-"}
     
-    # Update in-memory immediately so current session works
-    os.environ["OPENAI_API_KEY"] = key
-    
-    # We return success FIRST, then the server might reload if .env changes.
-    # On Windows, we'll wait a tiny bit to ensure the response is flushed.
-    import asyncio
-    
-    async def _delayed_write():
-        await asyncio.sleep(0.5)
+    try:
+        # 1. Update in-memory immediately
+        os.environ["OPENAI_API_KEY"] = key
+        
+        # 2. Write to .env synchronously and wait for it
         _write_env_key("OPENAI_API_KEY", key)
         
-    # Schedule the write to happen after the response is likely sent
-    asyncio.create_task(_delayed_write())
-    
-    return {"ok": True}
+        # 3. Double-check by reading it back
+        check = _read_env().get("OPENAI_API_KEY")
+        if check != key:
+            print(f"CRITICAL: Verification failed. Expected {key[:8]}..., got {str(check)[:8]}...")
+            return {"ok": False, "error": "Errore di scrittura su disco. Verifica i permessi di scrittura."}
+            
+        print("SUCCESS: API Key saved and verified.")
+        return {"ok": True}
+        
+    except Exception as e:
+        print(f"ERROR during save_settings: {e}")
+        return {"ok": False, "error": f"Errore interno: {str(e)}"}

@@ -38,19 +38,19 @@ if (!(Get-Command tesseract -ErrorAction SilentlyContinue)) {
 }
 
 # 4. Verifica/Installazione Poppler (necessario per pdf2image)
-$popplerPath = "C:\Program Files\poppler\Library\bin"
-if (!(Test-Path $popplerPath)) {
-    Write-Host "Poppler non trovato. Download in corso..." -ForegroundColor Yellow
-    $popplerUrl = "https://github.com/oschwartz10612/poppler-windows/releases/download/v24.02.0-0/Release-24.02.0-0.zip"
-    $popplerZip = "$env:TEMP\poppler.zip"
-    $popplerDest = "C:\Program Files\poppler"
-    Invoke-WebRequest -Uri $popplerUrl -OutFile $popplerZip
-    Expand-Archive -Path $popplerZip -DestinationPath $popplerDest -Force
-    Remove-Item $popplerZip
-    # Add to system PATH
-    $currentPath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
-    if ($currentPath -notlike "*$popplerPath*") {
-        [System.Environment]::SetEnvironmentVariable("Path", "$currentPath;$popplerPath", "Machine")
+if (!(Get-Command pdftoppm -ErrorAction SilentlyContinue)) {
+    Write-Host "Poppler non trovato. Installazione in corso via winget..." -ForegroundColor Yellow
+    # Install Poppler via winget (official/stable package)
+    winget install oschwartz10612.Poppler --silent --accept-package-agreements --accept-source-agreements
+    Refresh-Path
+    
+    # Check common installation path if winget doesn't add to PATH automatically
+    $standardPopplerPath = "C:\Program Files\poppler\Library\bin"
+    if (Test-Path $standardPopplerPath) {
+        $currentPath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+        if ($currentPath -notlike "*$standardPopplerPath*") {
+            [System.Environment]::SetEnvironmentVariable("Path", "$currentPath;$standardPopplerPath", "Machine")
+        }
     }
     Refresh-Path
     Write-Host "OK Poppler installato." -ForegroundColor Green

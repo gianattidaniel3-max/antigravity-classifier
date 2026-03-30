@@ -37,36 +37,36 @@ if (!(Get-Command tesseract -ErrorAction SilentlyContinue)) {
     Write-Host "OK Tesseract trovato." -ForegroundColor Green
 }
 
-# Scarica modello lingua Italiana se mancante
+# Scarica/Installa modello lingua Italiana se mancante
 $itaUrl = "https://github.com/tesseract-ocr/tessdata/raw/main/ita.traineddata"
-$sysTessPath = "C:\Program Files\Tesseract-OCR\tessdata\ita.traineddata"
-$localTessPath = "$PSScriptRoot\backend\resources\tessdata\ita.traineddata"
+$sysTessDir = "C:\Program Files\Tesseract-OCR\tessdata"
+$sysTessFull = "$sysTessDir\ita.traineddata"
+$localTessDir = "$PSScriptRoot\backend\resources\tessdata"
+$localTessFull = "$localTessDir\ita.traineddata"
 
-if (!(Test-Path $sysTessPath) -and !(Test-Path $localTessPath)) {
-    Write-Host "Modello lingua Italiana (ita) mancante. Scaricamento in corso..." -ForegroundColor Yellow
-    if (!(Test-Path (Split-Path $localTessPath))) { New-Item -ItemType Directory -Path (Split-Path $localTessPath) -Force }
+# Funzione per validare file (>5MB)
+function Is-Valid-Tess { param($f) return (Test-Path $f) -and (Get-Item $f).Length -gt 5000000 }
+
+if (!(Is-Valid-Tess $sysTessFull) -and !(Is-Valid-Tess $localTessFull)) {
+    Write-Host "`nModello lingua Italiana (ita) mancante. Scaricamento in corso..." -ForegroundColor Yellow
+    if (!(Test-Path $localTessDir)) { New-Item -ItemType Directory -Path $localTessDir -Force }
     try {
-        # Force TLS 1.2 for the download
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -Uri $itaUrl -OutFile $localTessPath -ErrorAction Stop
-        
-        # Check if the file is valid (at least 1MB)
-        if ((Get-Item $localTessPath).Length -lt 1000000) {
-            throw "File scaricato troppo piccolo, probabilmente corrotto o bloccato dal firewall."
-        }
-        Write-Host "OK Modello Italiano scaricato in: $localTessPath" -ForegroundColor Green
+        Invoke-WebRequest -Uri $itaUrl -OutFile $localTessFull -ErrorAction Stop
+        Write-Host "OK Modello Italiano scaricato locale." -ForegroundColor Green
     } catch {
         Write-Host "ERRORE nello scaricamento: $_" -ForegroundColor Red
-        Write-Host "Scaricalo manualmente da: $itaUrl e mettilo in backend\resources\tessdata" -ForegroundColor White
     }
-} else {
-    # Even if it exists, check if it's a valid size (>1MB)
-    if ((Test-Path $localTessPath) -and (Get-Item $localTessPath).Length -lt 1000000) {
-        Write-Host "Il file ita.traineddata locale sembra corrotto. Lo riscarico..." -ForegroundColor Yellow
-        Remove-Item $localTessPath
-        # Re-run download (logic would repeat on next loop, but let's just warn for now)
-    } else {
-        Write-Host "OK Modello lingua Italiana trovato." -ForegroundColor Green
+}
+
+# Tenta di copiare il modello nella cartella di sistema (richiede Admin)
+if ((Is-Valid-Tess $localTessFull) -and !(Is-Valid-Tess $sysTessFull) -and (Test-Path $sysTessDir)) {
+    Write-Host "Tento di collegare il modello Italiano al sistema Tesseract (richiede Admin)..." -ForegroundColor Yellow
+    try {
+        Copy-Item -Path $localTessFull -Destination $sysTessFull -ErrorAction SilentlyContinue
+        if (Is-Valid-Tess $sysTessFull) { Write-Host "OK Modello collegato al sistema!" -ForegroundColor Green }
+    } catch {
+        Write-Host "AVVISO: Impossibile copiare in $sysTessDir (permessi insufficienti). Continuo con modello locale." -ForegroundColor Gray
     }
 }
 

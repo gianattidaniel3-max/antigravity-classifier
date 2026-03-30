@@ -183,15 +183,19 @@ def process_document(self, document_id: str):
              except Exception as down_err:
                  print(f"DEBUG: Download failed: {down_err}")
         
-        # 2. Pick the best tessdata folder
+        # 2. Pick the best tessdata folder (Prioritize System folder for stability)
         valid_tessdata = None
         from pathlib import Path
-        if _is_valid(LOCAL_TESSDATA):
-            valid_tessdata = Path(LOCAL_TESSDATA)
-        elif os.name == "nt":
+        
+        # Priority 1: System Tesseract (More reliable on Windows)
+        if os.name == "nt":
             sys_tess = Path(r"C:\Program Files\Tesseract-OCR\tessdata")
             if _is_valid(sys_tess):
                 valid_tessdata = sys_tess
+
+        # Priority 2: Local project resources (Fallback)
+        if not valid_tessdata and _is_valid(LOCAL_TESSDATA):
+            valid_tessdata = Path(LOCAL_TESSDATA)
 
         # 3. Apply flag
         if valid_tessdata:

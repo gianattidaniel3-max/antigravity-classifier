@@ -263,7 +263,7 @@ def get_document_pdf(doc_id: str, db: Session = Depends(get_db)):
 def get_field_schema():
     return {
         "schema": field_schema_store.load(),
-        "available_fields": field_schema_store.AVAILABLE_FIELDS,
+        "available_fields": field_schema_store.get_all_known_fields(),
     }
 
 @router.put("/field-schema/{label}")

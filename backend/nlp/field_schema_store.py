@@ -25,8 +25,25 @@ AVAILABLE_FIELDS = [
 
 def load() -> dict[str, list[str]]:
     with _lock:
+        if not os.path.exists(_PATH):
+            return {}
         with open(_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
+
+
+def get_all_known_fields() -> list[str]:
+    """Return system fields + any custom fields currently in use in the schema."""
+    schema = load()
+    custom = set()
+    for fields in schema.values():
+        for f in fields:
+            custom.add(f)
+    # Merge, maintaining set order/uniqueness
+    all_f = list(AVAILABLE_FIELDS)
+    for f in sorted(list(custom)):
+        if f not in all_f:
+            all_f.append(f)
+    return all_f
 
 
 def save(schema: dict[str, list[str]]) -> None:

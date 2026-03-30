@@ -29,6 +29,7 @@ export default function TaxonomyPanel() {
   const [moving, setMoving]               = useState<{ label: string; from: string } | null>(null);
   const [error, setError]                 = useState('');
   const [loading, setLoading]             = useState(true);
+  const [customFieldInput, setCustomFieldInput] = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -269,6 +270,24 @@ export default function TaxonomyPanel() {
                                     </label>
                                   );
                                 })}
+
+                                {/* Custom Field Input */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginLeft: '0.2rem' }}>
+                                  <input 
+                                    placeholder="Add custom field..."
+                                    value={customFieldInput}
+                                    onChange={e => setCustomFieldInput(e.target.value)}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter' && customFieldInput.trim()) {
+                                        toggleField(label, customFieldInput.trim());
+                                        setCustomFieldInput('');
+                                        // Refresh available fields list from server
+                                        setTimeout(load, 500);
+                                      }
+                                    }}
+                                    style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '4px', border: '1px solid #d4d4d8', outline: 'none', background: 'white', width: '130px' }}
+                                  />
+                                </div>
                               </div>
                             </div>
                           )}

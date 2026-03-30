@@ -74,6 +74,7 @@ async def upload_batch(files: List[UploadFile] = File(...), case_id: Optional[st
     from backend.db.models import Case
     case = db.query(Case).filter_by(id=case_id).first() if case_id else None
     import io
+    results = []
     for file in files:
         if not file.filename.lower().endswith(".pdf"):
             results.append({"filename": file.filename, "error": "not a PDF"})

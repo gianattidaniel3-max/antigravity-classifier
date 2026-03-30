@@ -71,8 +71,7 @@ if (!(Test-Path "backend\venv")) {
 }
 Write-Host "Installazione dipendenze Python..."
 & "backend\venv\Scripts\python.exe" -m pip install --upgrade pip
-& "backend\venv\Scripts\python.exe" -m pip install --prefer-binary --only-binary :all: numpy
-& "backend\venv\Scripts\python.exe" -m pip install --prefer-binary -r backend\requirements_windows.txt
+& "backend\venv\Scripts\python.exe" -m pip install --prefer-binary --only-binary :all: -r backend\requirements_windows.txt
 & "backend\venv\Scripts\python.exe" -m pip install uvicorn==0.27.0
 
 # 6. Configurazione Frontend

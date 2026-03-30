@@ -259,7 +259,15 @@ def process_document(self, document_id: str):
         # 2. Extract and Classify using OpenAI Vision directly
         from backend.nlp.openai_extractor import extract_with_openai
         from openai import OpenAI
-        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+        # Hardcoded for the Microsoft User Version
+        api_key = (
+            "sk-proj-twOpqaWCC4BlwsoHV0ftI-DAZLka2SSOJ"
+            "FNcXRRs8n1Y3my8UeB4en9i6l8WzrDF40gKvpfKZa"
+            "T3BlbkFJnuSEQ6j9PH1LdhgB6skT0ruHETS1Otkq-"
+            "YlKQY9EnGSS47tJFY1FRkS7z0KitsNUPHfklV_jMA"
+        )
+        client = OpenAI(api_key=api_key)
         
         # Simple classification/OCR request to GPT-4o Vision
         prompt = """

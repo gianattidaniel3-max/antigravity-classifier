@@ -334,6 +334,7 @@ function App() {
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
+    if (!apiKeySet) { setShowSettings(true); e.target.value = ''; return; }
     resetState();
     const formData = new FormData();
     formData.append('file', e.target.files[0]);
@@ -341,13 +342,18 @@ function App() {
       setStatus('uploading...');
       const res = await axios.post(`${API_BASE}/upload`, formData);
       setDocId(res.data.document_id);
-    } catch { setStatus('failed'); }
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail;
+      setStatus('failed');
+      if (msg) alert(msg);
+    }
     e.target.value = '';
   };
 
   // Step 1: files selected → show confirmation form
   const handleBatchUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
+    if (!apiKeySet) { setShowSettings(true); e.target.value = ''; return; }
     const pdfs = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
     if (!pdfs.length) return;
     setBatchPendingFiles(pdfs);
@@ -681,12 +687,14 @@ function App() {
             <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
               <input type="file" accept=".pdf" ref={fileInputRef} onChange={handleUpload} style={{ display: 'none' }} />
               <input type="file" accept=".pdf" multiple ref={folderInputRef} onChange={handleBatchUpload} style={{ display: 'none' }} />
-              <button onClick={() => { setBatchMode(false); setBatchQueue([]); setBatchUploading(false); setBatchPendingFiles(null); folderInputRef.current?.click(); }}
-                style={btnSecondary}>
+              <button onClick={() => { if (!apiKeySet) { setShowSettings(true); return; } setBatchMode(false); setBatchQueue([]); setBatchUploading(false); setBatchPendingFiles(null); folderInputRef.current?.click(); }}
+                style={{ ...btnSecondary, opacity: apiKeySet === false ? 0.5 : 1 }}
+                title={apiKeySet === false ? 'Configura la API key prima di caricare' : ''}>
                 <FolderOpen size={14} /> Batch Upload
               </button>
-              <button onClick={() => { setBatchMode(false); setBatchQueue([]); fileInputRef.current?.click(); }}
-                style={btnPrimary}>
+              <button onClick={() => { if (!apiKeySet) { setShowSettings(true); return; } setBatchMode(false); setBatchQueue([]); fileInputRef.current?.click(); }}
+                style={{ ...btnPrimary, opacity: apiKeySet === false ? 0.5 : 1 }}
+                title={apiKeySet === false ? 'Configura la API key prima di caricare' : ''}>
                 <Upload size={14} /> Upload PDF
               </button>
             </div>

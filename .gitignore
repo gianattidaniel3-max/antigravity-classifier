@@ -1,42 +1,35 @@
 # Python
-venv/
+backend/venv/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
-*.egg-info/
-dist/
-build/
-.eggs/
-
-# Node
-node_modules/
-frontend/dist/
 
 # Environment
-.env
+backend/.env
 *.env
 
-# DB / data
+# Database
 *.db
 *.sqlite3
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Logs
+*.log
 
 # OS
 .DS_Store
 Thumbs.db
 
-# IDE
-.vscode/
-.idea/
-
-# Test artifacts
+# Temp / OCR working files
 tmp/
-*.png
-test_ocr*.py
-test.png
+backend/data/
 
-# Agent internals
-.agent/
-gem_id.txt
-notebook_uris.json
+# Test images
+*.png
+*.jpg
+*.jpeg

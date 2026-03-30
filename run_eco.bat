@@ -26,17 +26,19 @@ if not exist "frontend\node_modules" (
     cd frontend && npm install && cd ..
 )
 
-:: 3. Start Backend in background
+:: 3. Start Backend in background (log to file for diagnostics)
 echo [*] Avvio Backend (ECO Engine)...
-start "ECO_BACKEND_SERVICE" /min cmd /c "cd /d "%BASEDIR%" && backend\venv\Scripts\python -m uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --no-reload"
+start "ECO_BACKEND_SERVICE" /min cmd /c "cd /d "%BASEDIR%" && backend\venv\Scripts\python -m uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 > "%BASEDIR%eco_backend.log" 2>&1"
 
 :: 4. Start Frontend
 echo [*] Avvio Interfaccia...
 echo [*] L'applicazione si aprira' automaticamente nel browser...
 echo.
 echo [INFO] Per chiudere ECO, chiudi questa finestra.
+echo [INFO] Log backend: %BASEDIR%eco_backend.log
 
-:: 5. Open Browser after a short delay
+:: 5. Open Browser after delay (wait for backend to be ready)
+timeout /t 4 /nobreak >nul
 start "" http://localhost:5173
 
 :: 6. Run Frontend in current window

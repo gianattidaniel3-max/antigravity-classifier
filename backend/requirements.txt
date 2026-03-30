@@ -14,6 +14,7 @@ torch==2.1.2
 sentencepiece==0.1.99
 pytesseract==0.3.10
 pdf2image==1.17.0
+pypdf>=4.0.0
 numpy==1.26.4
 spacy==3.7.4
 # After install: python -m spacy download it_core_news_lg

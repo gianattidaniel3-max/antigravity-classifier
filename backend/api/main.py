@@ -28,10 +28,13 @@ app.add_middleware(
 
 # Auth router already has prefix="/auth" inside its file,
 # so including it with "/api" results in "/api/auth/..."
+# IMPORTANT: stats_router must be registered before documents_router because
+# stats_router has literal paths like /documents/export-csv that would otherwise
+# be shadowed by documents_router's /documents/{doc_id} parameterized route.
 app.include_router(auth_router, prefix="/api")
-app.include_router(documents_router, prefix="/api")
-app.include_router(analysis_router, prefix="/api")
 app.include_router(stats_router, prefix="/api")
+app.include_router(analysis_router, prefix="/api")
+app.include_router(documents_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
 
 @app.on_event("startup")

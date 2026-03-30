@@ -12,8 +12,9 @@ _lock = threading.Lock()
 
 
 def load() -> dict[str, list[str]]:
-    with open(_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+    with _lock:
+        with open(_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
 
 
 def save(taxonomy: dict[str, list[str]]) -> None:

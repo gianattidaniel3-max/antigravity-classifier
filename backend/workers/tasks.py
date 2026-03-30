@@ -1,6 +1,10 @@
 """
 Async processing pipeline: PDF → OCR → LLM Vision → PostgreSQL
 
+import os as _os
+from dotenv import load_dotenv as _load_dotenv
+_load_dotenv(_os.path.join(_os.path.dirname(__file__), "..", ".env"), override=True)
+
 Phase 1 (FAST, ~3-5 s)
   OCR page 1 only → keyword classify → store temp_label/category/score
   Status set to TEMP_CLASSIFIED so the frontend can show an immediate result.
@@ -67,12 +71,15 @@ except Exception:
                 def delay(*args, **kwargs):
                     import threading
                     print(f"DEBUG: Running task {f.__name__} in background thread")
-                    # Create a dummy 'self' that has a 'retry' method for compatibility
+                    # Create a dummy 'self' that has a 'retry' method for compatibility.
+                    # retry() must raise — in real Celery it raises celery.exceptions.Retry.
+                    # Here we re-raise the original exception so the thread exits cleanly.
                     class TaskSelf:
-                        def retry(self, *args, **kwargs): 
-                            print(f"DEBUG: Task {f.__name__} requested retry")
+                        def retry(self, exc=None, *args, **kwargs):
+                            print(f"DEBUG: Task {f.__name__} requested retry (local mode — not retrying)")
+                            raise exc if exc is not None else RuntimeError("task failed")
                     t = threading.Thread(target=f, args=(TaskSelf(), *args), kwargs=kwargs)
-                    t.daemon = True 
+                    t.daemon = True
                     t.start()
                 f.delay = delay
                 return f
@@ -89,6 +96,29 @@ _BATCH_SIZE = 4
 # DPI for vision images sent to GPT-4o.
 # 150 DPI → ~1240×1754 px for A4 (well within GPT-4o 2048-px limit).
 _VISION_DPI = 150
+
+# ── Windows: set explicit binary paths for Tesseract and Poppler ─────────────
+_POPPLER_PATH = None
+if os.name == "nt":
+    import pytesseract as _pyt
+    _TESS_CANDIDATES = [
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+    ]
+    for _p in _TESS_CANDIDATES:
+        if os.path.exists(_p):
+            _pyt.pytesseract.tesseract_cmd = _p
+            break
+
+    _POPPLER_CANDIDATES = [
+        r"C:\Program Files\poppler\Library\bin",
+        r"C:\Program Files\poppler\bin",
+        r"C:\poppler\bin",
+    ]
+    for _p in _POPPLER_CANDIDATES:
+        if os.path.exists(_p):
+            _POPPLER_PATH = _p
+            break
 
 
 @celery_app.task(bind=True, max_retries=3)
@@ -161,7 +191,8 @@ def process_document(self, document_id: str):
         # PHASE 1 — Zero-shot OCR on page 1 → temporary classification
         # ═════════════════════════════════════════════════════════════════════
         images_p1 = convert_from_bytes(
-            pdf_bytes, dpi=120, first_page=1, last_page=1
+            pdf_bytes, dpi=120, first_page=1, last_page=1,
+            poppler_path=_POPPLER_PATH,
         )
         page1_text = ocr_page(images_p1[0])
 
@@ -186,6 +217,7 @@ def process_document(self, document_id: str):
         vision_images = convert_from_bytes(
             pdf_bytes, dpi=_VISION_DPI,
             first_page=1, last_page=total_pages,
+            poppler_path=_POPPLER_PATH,
         )
 
         field_schema = fss.load()
@@ -229,6 +261,7 @@ def process_document(self, document_id: str):
                 batch_imgs = convert_from_bytes(
                     pdf_bytes, dpi=120,
                     first_page=batch_start, last_page=batch_end,
+                    poppler_path=_POPPLER_PATH,
                 )
                 with ThreadPoolExecutor(max_workers=1) as ex:
                     batch_texts = list(ex.map(ocr_page, batch_imgs))
@@ -238,7 +271,7 @@ def process_document(self, document_id: str):
         full_ocr  = "".join(
             f"\n[Pagina {i+1}]\n{t}" for i, t in enumerate(all_texts)
         )
-        ocr_path  = doc.minio_pdf_path.replace(".pdf", ".txt")
+        ocr_path  = doc.minio_pdf_path.rsplit(".pdf", 1)[0] + ".txt"
         ocr_bytes = full_ocr.encode("utf-8")
         minio_client.put_object(
             "ocr-text", ocr_path,

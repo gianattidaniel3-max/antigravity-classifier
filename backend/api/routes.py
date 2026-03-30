@@ -38,10 +38,13 @@ router = APIRouter()
 
 @router.post("/upload")
 async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if not api_key or not api_key.startswith("sk-"):
+        raise HTTPException(status_code=400, detail="API key OpenAI non configurata. Vai su Impostazioni e inserisci la chiave prima di caricare documenti.")
     ensure_buckets()
     doc_id = str(uuid.uuid4())
     minio_path = f"{doc_id}_{file.filename}"
-    
+
     try:
         # Since we use minio client without a fixed size stream, upload via file.read() for prototyping
         data = await file.read()
@@ -68,6 +71,9 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
 
 @router.post("/upload-batch")
 async def upload_batch(files: List[UploadFile] = File(...), case_id: Optional[str] = None, db: Session = Depends(get_db)):
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if not api_key or not api_key.startswith("sk-"):
+        raise HTTPException(status_code=400, detail="API key OpenAI non configurata. Vai su Impostazioni e inserisci la chiave prima di caricare documenti.")
     ensure_buckets()
     results = []
     # If case_id is present, get the case once

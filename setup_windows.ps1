@@ -60,15 +60,10 @@ if (!(Is-Valid-Tess $sysTessFull) -and !(Is-Valid-Tess $localTessFull)) {
     }
 }
 
-# Tenta di copiare il modello nella cartella di sistema (richiede Admin)
+# Tenta di copiare il modello nella cartella di sistema (solo se Admin)
 if ((Is-Valid-Tess $localTessFull) -and !(Is-Valid-Tess $sysTessFull) -and (Test-Path $sysTessDir)) {
-    Write-Host "Tento di collegare il modello Italiano al sistema Tesseract (richiede Admin)..." -ForegroundColor Yellow
-    try {
-        Copy-Item -Path $localTessFull -Destination $sysTessFull -ErrorAction SilentlyContinue
-        if (Is-Valid-Tess $sysTessFull) { Write-Host "OK Modello collegato al sistema!" -ForegroundColor Green }
-    } catch {
-        Write-Host "AVVISO: Impossibile copiare in $sysTessDir (permessi insufficienti). Continuo con modello locale." -ForegroundColor Gray
-    }
+    Write-Host "Collegamento modello Tesseract (opzionale)..." -ForegroundColor Gray
+    Copy-Item -Path $localTessFull -Destination $sysTessFull -ErrorAction SilentlyContinue
 }
 
 # 4. Verifica/Installazione Poppler (necessario per pdf2image)

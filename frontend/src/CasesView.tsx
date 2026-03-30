@@ -321,10 +321,34 @@ export default function CasesView() {
       if (directFields.includes(field)) {
         payload[field] = value;
       } else {
+        // Nested fields go into extracted_fields JSON
         payload.extracted_fields = { [field]: value };
       }
+      
+      // Update the local state first for instant feedback (optimistic update)
+      if (selectedCase) {
+        setSelectedCase({
+          ...selectedCase,
+          documents: selectedCase.documents?.map(doc => {
+            if (doc.id === docId) {
+              if (directFields.includes(field)) {
+                return { ...doc, [field]: value, human_verified: true };
+              } else {
+                return { 
+                  ...doc, 
+                  extracted_fields: { ...doc.extracted_fields, [field]: value },
+                  human_verified: true
+                };
+              }
+            }
+            return doc;
+          })
+        });
+      }
+
       await axios.patch(`${API_BASE}/documents/${docId}`, payload);
-      if (selectedCase) loadCase(selectedCase.id);
+      // Optional: reload case to ensure sync
+      // if (selectedCase) loadCase(selectedCase.id);
     } catch (e: any) {
       setError(e.response?.data?.detail || 'Errore aggiornamento');
     }
@@ -336,7 +360,7 @@ export default function CasesView() {
     
     if (isEditing) {
       return (
-        <td style={{ padding: '0.4rem 0.6rem', ...style }}>
+        <td style={{ padding: '0', ...style }}>
           <input
             autoFocus
             value={editValue}
@@ -348,12 +372,15 @@ export default function CasesView() {
             }}
             style={{ 
               width: '100%', 
+              height: '100%',
               fontSize: '0.75rem', 
-              padding: '2px 4px', 
-              border: '1px solid #2d6a4f', 
-              borderRadius: '2px',
+              padding: '0.6rem', 
+              border: '2px solid #52b788', 
+              borderRadius: '0',
               outline: 'none',
-              background: 'white'
+              background: '#f0fdf4',
+              boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)',
+              fontFamily: 'inherit'
             }}
           />
         </td>
@@ -362,33 +389,46 @@ export default function CasesView() {
 
     return (
       <td 
-        style={{ padding: '0.6rem 0.6rem', cursor: 'pointer', position: 'relative', ...style }}
+        style={{ 
+          padding: '0.6rem', 
+          cursor: 'text', 
+          position: 'relative', 
+          transition: 'all 0.15s',
+          border: '1px solid transparent',
+          ...style 
+        }}
         onClick={() => {
           setEditingCell({ docId, field });
           setEditValue(value || '');
         }}
         onMouseEnter={e => {
-          e.currentTarget.style.background = 'rgba(45,106,79,0.05)';
+          e.currentTarget.style.background = 'rgba(82, 183, 136, 0.08)';
+          e.currentTarget.style.borderColor = 'rgba(82, 183, 136, 0.3)';
           const icon = e.currentTarget.querySelector('.edit-hint');
           if (icon) (icon as HTMLElement).style.opacity = '1';
         }}
         onMouseLeave={e => {
           e.currentTarget.style.background = 'transparent';
+          e.currentTarget.style.borderColor = 'transparent';
           const icon = e.currentTarget.querySelector('.edit-hint');
           if (icon) (icon as HTMLElement).style.opacity = '0';
         }}
         title="Clicca per modificare"
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'space-between', minHeight: '1.2rem' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             {field === 'llm_notes' && value ? (
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
-                <Sparkles size={11} style={{ marginTop: '2px', flexShrink: 0 }} />
-                <span style={{ fontSize: '0.7rem', fontStyle: 'italic', lineHeight: 1.3 }}>{value}</span>
+                <Sparkles size={11} color="#d97706" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.7rem', fontStyle: 'italic', lineHeight: 1.3, color: '#92400e' }}>{value}</span>
               </div>
-            ) : (value || '—')}
+            ) : (
+              <span style={{ color: value ? 'inherit' : '#a1a1aa' }}>
+                {value || '—'}
+              </span>
+            )}
           </div>
-          <span className="edit-hint" style={{ opacity: 0, transition: 'opacity 0.2s', fontSize: '0.65rem', color: '#2d6a4f', flexShrink: 0 }}>✎</span>
+          <span className="edit-hint" style={{ opacity: 0, transition: 'opacity 0.2s', fontSize: '0.65rem', color: '#52b788', flexShrink: 0 }}>✎</span>
         </div>
       </td>
     );

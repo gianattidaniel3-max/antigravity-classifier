@@ -1,125 +1,26 @@
-"""
-Async processing pipeline: PDF → OCR → LLM Vision → PostgreSQL
-
-import os as _os
-from dotenv import load_dotenv as _load_dotenv
-_load_dotenv(_os.path.join(_os.path.dirname(__file__), "..", ".env"), override=True)
-
-Phase 1 (FAST, ~3-5 s)
-  OCR page 1 only → keyword classify → store temp_label/category/score
-  Status set to TEMP_CLASSIFIED so the frontend can show an immediate result.
-
-Phase 2 (LLM Vision, variable)
-  All pages rendered as PNG images → sent to GPT-4o Vision with:
-    - temp classification as a hint
-    - page-1 OCR text as a hint
-    - field schema for the detected document type
-    - full taxonomy for label validation
-  LLM result populates llm_* columns and becomes the authoritative
-  extracted_label / extracted_fields.
-  Status set to NEEDS_REVIEW.
-
-Phase 3 (BACKGROUND full OCR)
-  Remaining pages OCR'd and stored to MinIO as a .txt object.
-"""
 import os
 import io
 import time
-from concurrent.futures import ThreadPoolExecutor
+from typing import List, Optional
 from celery import Celery
-import redis as redis_lib
+from sqlalchemy.orm import Session
 from backend.db.session import SessionLocal
 from backend.db.models import Document, DocumentStatus
 from backend.nlp.storage import client as minio_client
+from pdf2image import convert_from_bytes
+from pypdf import PdfReader
+from concurrent.futures import ThreadPoolExecutor
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+celery_app = Celery("document_worker", broker=os.getenv("REDIS_URL", "redis://localhost:6379/0"))
 
-try:
-    _redis = redis_lib.Redis.from_url(REDIS_URL, decode_responses=True)
-    _redis.ping()
-    celery_app = Celery(
-        "file_classifier_tasks",
-        broker=REDIS_URL,
-        backend=REDIS_URL,
-    )
-except Exception:
-    class DummyRedis:
-        def __init__(self): 
-            self.store = {}
-            print("WARNING: Using Dummy Redis (Local Mode)")
-        def ping(self): 
-            return True
-        def hset(self, key, mapping=None, **kwargs):
-            if key not in self.store: self.store[key] = {}
-            if mapping: self.store[key].update(mapping)
-            self.store[key].update(kwargs)
-            return 1
-        def hgetall(self, key): return self.store.get(key, {})
-        def hincrby(self, key, field, amount=1):
-            if key not in self.store: self.store[key] = {}
-            val = int(self.store[key].get(field, 0)) + amount
-            self.store[key][field] = str(val)
-            return val
-        def expire(self, key, time): pass
-        def hget(self, key, field): return self.store.get(key, {}).get(field)
-    
-    _redis = DummyRedis()
-    
-    class DummyCelery:
-        def task(self, *args, **kwargs):
-            def decorator(f):
-                def delay(*args, **kwargs):
-                    import threading
-                    print(f"DEBUG: Running task {f.__name__} in background thread")
-                    # Create a dummy 'self' that has a 'retry' method for compatibility.
-                    # retry() must raise — in real Celery it raises celery.exceptions.Retry.
-                    # Here we re-raise the original exception so the thread exits cleanly.
-                    class TaskSelf:
-                        def retry(self, exc=None, *args, **kwargs):
-                            print(f"DEBUG: Task {f.__name__} requested retry (local mode — not retrying)")
-                            raise exc if exc is not None else RuntimeError("task failed")
-                    t = threading.Thread(target=f, args=(TaskSelf(), *args), kwargs=kwargs)
-                    t.daemon = True
-                    t.start()
-                f.delay = delay
-                return f
-            return decorator
-    celery_app = DummyCelery()
-
-LOCAL_TESSDATA = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "resources", "tessdata")
-)
-
-# Pages rendered per batch in phase 3 (controls peak RAM during full OCR).
-_BATCH_SIZE = 4
-
-# DPI for vision images sent to GPT-4o.
-# 150 DPI → ~1240×1754 px for A4 (well within GPT-4o 2048-px limit).
+# Constants for Vision processing
 _VISION_DPI = 150
 
-# ── Binary detection: Tesseract and Poppler ────────────────────────────────────
-import pytesseract as _pyt
+# ── Poppler detection ────────────────────────────────────────────────────────
 import shutil
-_T_PATH = os.getenv("TESSERACT_PATH") or shutil.which("tesseract")
-if not _T_PATH:
-    _T_CANDS = [
-        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-        r"C:\Tesseract-OCR\tesseract.exe",
-        "/opt/homebrew/bin/tesseract",
-        "/usr/local/bin/tesseract"
-    ]
-    for _p in _T_CANDS:
-        if os.path.exists(_p):
-            _T_PATH = _p; break
-
-if _T_PATH:
-    _pyt.pytesseract.tesseract_cmd = _T_PATH
-
-# 2. Poppler detection
 _P_PATH = os.getenv("POPPLER_PATH") or shutil.which("pdfinfo")
+_POPPLER_PATH = None
 if _P_PATH:
-    # If we found pdfinfo, we want the directory containing it
     _POPPLER_PATH = os.path.dirname(_P_PATH)
 else:
     _P_CANDS = [
@@ -132,135 +33,45 @@ else:
         if os.path.exists(os.path.join(_p, "pdfinfo.exe" if os.name=="nt" else "pdfinfo")):
             _POPPLER_PATH = _p; break
 
-
 @celery_app.task(bind=True, max_retries=3)
 def process_document(self, document_id: str):
     db = SessionLocal()
     try:
         doc = db.query(Document).filter(Document.id == document_id).first()
-        if not doc:
-            return
+        if not doc: return
 
         doc.status = DocumentStatus.PROCESSING
         db.commit()
 
-        from pdf2image import convert_from_bytes
-        from pypdf import PdfReader
-        import pytesseract
         import json as _json
-        from backend.nlp.classifier import classify_legal_text
-        from backend.nlp.date_extractor import extract_date
+        from backend.nlp.openai_extractor import extract_with_openai
+        from openai import OpenAI
 
-        # ── Download PDF ─────────────────────────────────────────────────────
+        # ── Step 1: Download PDF ──────────────────────────────────────────────
         response  = minio_client.get_object("documents", doc.minio_pdf_path)
         pdf_bytes = response.read()
-        response.close()
-        response.release_conn()
+        response.close(); response.release_conn()
 
-        total_pages = len(PdfReader(io.BytesIO(pdf_bytes)).pages)
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        total_pages = len(reader.pages)
 
-        tess_config = "--psm 3 --oem 1 --dpi 120"
-        ita_filename = "ita.traineddata"
-        ita_local_path = os.path.join(LOCAL_TESSDATA, ita_filename)
-        ita_url = "https://github.com/tesseract-ocr/tessdata/raw/main/ita.traineddata"
-        
-        def _is_valid(p):
-            target = os.path.join(p, ita_filename)
-            return os.path.exists(target) and os.path.getsize(target) > 5_000_000
-            
-        # 1. AUTONOMOUS DOWNLOAD if missing or corrupted
-        if not _is_valid(LOCAL_TESSDATA):
-             os.makedirs(LOCAL_TESSDATA, exist_ok=True)
-             import requests
-             print(f"DEBUG: Missing or corrupted {ita_filename}. Starting autonomous download...")
-             try:
-                 resp = requests.get(ita_url, timeout=60, stream=True)
-                 resp.raise_for_status()
-                 with open(ita_local_path, "wb") as f:
-                     for chunk in resp.iter_content(chunk_size=8192):
-                         f.write(chunk)
-                 print(f"DEBUG: Successfully downloaded {ita_filename} to {ita_local_path}")
-             except Exception as down_err:
-                 print(f"DEBUG: Download failed: {down_err}")
-        
-        # 2. Pick the best tessdata folder (Prioritize System folder for stability)
-        valid_tessdata = None
-        from pathlib import Path
-        
-        # Priority 1: System Tesseract (More reliable on Windows)
-        if os.name == "nt":
-            sys_tess = Path(r"C:\Program Files\Tesseract-OCR\tessdata")
-            if _is_valid(sys_tess):
-                valid_tessdata = sys_tess
-
-        # Priority 2: Local project resources (Fallback)
-        if not valid_tessdata and _is_valid(LOCAL_TESSDATA):
-            valid_tessdata = Path(LOCAL_TESSDATA)
-
-        # 3. Apply flag
-        if valid_tessdata:
-            # On Windows, enforce Path handling to get clean backslashes
-            tess_config += f' --tessdata-dir "{valid_tessdata}"'
-        
-        # Clear legacy env var if set to our local dir to avoid Tesseract internal confusion
-        if os.environ.get("TESSDATA_PREFIX") == str(LOCAL_TESSDATA):
-            del os.environ["TESSDATA_PREFIX"]
-
-        prog_key = f"progress:{document_id}"
-        _redis.hset(prog_key, mapping={
-            "completed": 0,
-            "total": total_pages,
-            "start": time.time(),
-        })
-        _redis.expire(prog_key, 3600)
-
-        # ── Helpers ───────────────────────────────────────────────────────────
-        def _preprocess(image):
-            from PIL import Image
-            img = image.convert("L")
-            if img.width > 1400:
-                ratio = 1400 / img.width
-                img = img.resize((1400, int(img.height * ratio)), Image.BILINEAR)
-            return img
-
-        def ocr_page(image):
-            import uuid
-            tmp_dir = os.path.join(
-                os.path.dirname(__file__), "..", "..", "tmp"
-            )
-            os.makedirs(tmp_dir, exist_ok=True)
-            tmp_path = os.path.join(tmp_dir, f"ocr_{uuid.uuid4()}.png")
-            try:
-                _preprocess(image).save(tmp_path)
-                result = pytesseract.image_to_string(
-                    tmp_path, lang="ita", config=tess_config
-                )
-                _redis.hincrby(prog_key, "completed", 1)
-                return result
-            finally:
-                if os.path.exists(tmp_path):
-                    os.remove(tmp_path)
-
-        # ═════════════════════════════════════════════════════════════════════
-        # PHASE 1 — Vision-based Classification (No more local Tesseract errors!)
-        # ═════════════════════════════════════════════════════════════════════
+        # ── Step 2: Preliminary Vision Analysis (Page 1) ──────────────────────
         images_p1 = convert_from_bytes(
             pdf_bytes, dpi=_VISION_DPI, first_page=1, last_page=1,
             poppler_path=_POPPLER_PATH,
         )
+        if not images_p1:
+            raise Exception("Impossibile convertire il PDF in immagini.")
+            
         img_p1 = images_p1[0]
         
-        # 1. Convert PIL image to base64 for GPT-4o Vision
+        # Convert to base64 for Vision API
         import base64
         buffered = io.BytesIO()
         img_p1.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode()
 
-        # 2. Extract and Classify using OpenAI Vision directly
-        from backend.nlp.openai_extractor import extract_with_openai
-        from openai import OpenAI
-
-        # Hardcoded for the Microsoft User Version
+        # Hardcoded for Microsoft User Version
         api_key = (
             "sk-proj-twOpqaWCC4BlwsoHV0ftI-DAZLka2SSOJ"
             "FNcXRRs8n1Y3my8UeB4en9i6l8WzrDF40gKvpfKZa"
@@ -269,129 +80,81 @@ def process_document(self, document_id: str):
         )
         client = OpenAI(api_key=api_key)
         
-        # Simple classification/OCR request to GPT-4o Vision
         prompt = """
-        Analyze this Italian legal document (Page 1) and:
-        1. Extract the primary text content (OCR).
-        2. Identify:
-           - Label: (e.g. Decreto Ingiuntivo, Fattura, Atto di Citazione, etc.)
-           - Category: (e.g. Giustizia Civile, Fiscale, Amministrativo)
-           - Extracted Date: (format DD/MM/YYYY)
-        Return JSON format.
+        Analizza questo documento legale/bancario italiano (Pagina 1) e restituisci un JSON:
+        {
+           "ocr_text": "un breve riassunto testuale (max 500 caratteri)",
+           "label": "Tipo documento (es. Decreto Ingiuntivo, Fattura, etc.)",
+           "category": "Categoria (es. Giustizia Civile, Fiscale)",
+           "extracted_date": "Data rilevante (format DD/MM/YYYY)"
+        }
         """
         response = client.chat.completions.create(
             model="gpt-4o",
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
-                ]
-            }],
+            messages=[{"role": "user", "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
+            ]}],
             response_format={"type": "json_object"}
         )
         
         prediction = _json.loads(response.choices[0].message.content)
-        page1_text = prediction.get("ocr_text", "Failed to extract text automatically.")
+        page1_text = prediction.get("ocr_text", "")
 
-        doc.temp_label    = prediction.get("label", "Unknown")
-        doc.temp_category = prediction.get("category", "General")
-        doc.temp_score    = 0.95
+        doc.temp_label     = prediction.get("label", "Sconosciuto")
+        doc.temp_category  = prediction.get("category", "Generale")
+        doc.temp_score     = 0.95
         doc.extracted_date = prediction.get("extracted_date")
-        doc.status         = DocumentStatus.TEMP_CLASSIFIED
+        doc.status          = DocumentStatus.TEMP_CLASSIFIED
         db.commit()
 
-        # ═════════════════════════════════════════════════════════════════════
-        # PHASE 2 — GPT-4o Vision: full document → confirmed classification
-        #           + structured field extraction
-        # ═════════════════════════════════════════════════════════════════════
-        from backend.nlp.openai_extractor import extract_with_openai
+        # ── Step 3: Deep Field Extraction (Full Vision Analysis) ───────────────
         import backend.nlp.field_schema_store as fss
         import backend.nlp.taxonomy as tx
 
-        # Render all pages at vision DPI (capped inside openai_extractor)
-        vision_images = convert_from_bytes(
-            pdf_bytes, dpi=_VISION_DPI,
-            first_page=1, last_page=total_pages,
-            poppler_path=_POPPLER_PATH,
-        )
-
+        # Load dynamic configurations
         field_schema = fss.load()
         taxonomy     = tx.load()
 
-        llm_result = extract_with_openai(
-            images        = vision_images,
-            temp_label    = doc.temp_label,
-            temp_category = doc.temp_category,
-            temp_score    = doc.temp_score,
-            ocr_page1_text = page1_text,
-            field_schema  = field_schema,
-            taxonomy      = taxonomy,
+        # Render relevant pages for deep analysis (often just the first N)
+        vision_images = convert_from_bytes(
+            pdf_bytes, dpi=_VISION_DPI,
+            first_page=1, last_page=min(total_pages, 5), # Limit to first 5 for speed/cost
+            poppler_path=_POPPLER_PATH,
         )
 
-        doc.llm_label                = llm_result["label"]
-        doc.llm_category             = llm_result["category"]
-        doc.llm_fields               = llm_result["fields"]
-        doc.llm_classification_match = llm_result["ocr_agrees"]
-        doc.llm_notes                = llm_result["notes"]
+        llm_result = extract_with_openai(
+            images         = vision_images,
+            temp_label     = doc.temp_label,
+            temp_category  = doc.temp_category,
+            temp_score     = 0.95,
+            ocr_page1_text = page1_text,
+            field_schema   = field_schema,
+            taxonomy       = taxonomy,
+        )
 
-        # LLM result becomes the authoritative classification
+        # Map results to authoritative fields
         doc.extracted_label    = llm_result["label"]
         doc.extracted_category = llm_result["category"]
         doc.extracted_fields   = llm_result["fields"]
-        # Confidence: map LLM string to float for UI consistency
+        doc.llm_notes          = llm_result["notes"]
+        
         _conf_map = {"high": 0.95, "medium": 0.75, "low": 0.50}
         doc.confidence_score = _conf_map.get(llm_result["confidence"], 0.50)
 
+        # Status: Success
         doc.status = DocumentStatus.NEEDS_REVIEW
-        db.commit()  # ← authoritative result available to frontend
-
-        # ═════════════════════════════════════════════════════════════════════
-        # PHASE 3 — Full OCR remaining pages → store to MinIO
-        # ═════════════════════════════════════════════════════════════════════
-        all_texts = [page1_text] + [None] * (total_pages - 1)
-
-        if total_pages > 1:
-            for batch_start in range(2, total_pages + 1, _BATCH_SIZE):
-                batch_end  = min(batch_start + _BATCH_SIZE - 1, total_pages)
-                batch_imgs = convert_from_bytes(
-                    pdf_bytes, dpi=120,
-                    first_page=batch_start, last_page=batch_end,
-                    poppler_path=_POPPLER_PATH,
-                )
-                with ThreadPoolExecutor(max_workers=1) as ex:
-                    batch_texts = list(ex.map(ocr_page, batch_imgs))
-                for j, t in enumerate(batch_texts):
-                    all_texts[batch_start - 1 + j] = t
-
-        full_ocr  = "".join(
-            f"\n[Pagina {i+1}]\n{t}" for i, t in enumerate(all_texts)
-        )
-        ocr_path  = doc.minio_pdf_path.rsplit(".pdf", 1)[0] + ".txt"
-        ocr_bytes = full_ocr.encode("utf-8")
-        minio_client.put_object(
-            "ocr-text", ocr_path,
-            io.BytesIO(ocr_bytes), length=len(ocr_bytes),
-        )
-        doc.minio_ocr_text_path = ocr_path
         db.commit()
 
     except Exception as e:
         import traceback
-        tb = traceback.format_exc()
-        print(f"ERROR processing {document_id}: {e}\n{tb}")
+        print(f"FAILED {document_id}: {str(e)}\n{traceback.format_exc()}")
         try:
             doc = db.query(Document).filter(Document.id == document_id).first()
-            if doc:
+            if doc and doc.status != DocumentStatus.NEEDS_REVIEW:
                 doc.status = DocumentStatus.FAILED
-                # Store the error reason so the frontend can display it
-                doc.llm_notes = f"Errore: {type(e).__name__}: {str(e)[:500]}"
+                doc.llm_notes = f"Errore: {str(e)[:400]}"
                 db.commit()
-        except Exception as db_err:
-            print(f"ERROR writing FAILED status: {db_err}")
-        # In local/Windows mode self.retry() just re-raises and kills the daemon
-        # thread — skip it and let the thread exit cleanly.
-        if hasattr(self, '_is_real_celery'):
-            raise self.retry(exc=e, countdown=60)
+        except: pass
     finally:
         db.close()

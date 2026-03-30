@@ -37,9 +37,7 @@ def save(schema: dict[str, list[str]]) -> None:
 
 def set_label_fields(label: str, fields: list[str]) -> dict:
     """Set the extraction fields for a single label. Creates the entry if missing."""
-    unknown = [f for f in fields if f not in AVAILABLE_FIELDS]
-    if unknown:
-        raise ValueError(f"Unknown fields: {unknown}. Available: {AVAILABLE_FIELDS}")
+    # Allow any field name now, to enable full customization.
     schema = load()
     schema[label] = fields
     save(schema)

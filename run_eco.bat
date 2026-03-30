@@ -26,9 +26,11 @@ if not exist "frontend\node_modules" (
     cd frontend && npm install && cd ..
 )
 
-:: 3. Start Backend in background (log to file for diagnostics)
+:: 3. Start Backend in background
+:: Note: CWD is already set to BASEDIR (line 10), inherited by start.
+:: Avoid nested quotes inside cmd /c "..." to prevent Windows parser issues.
 echo [*] Avvio Backend (ECO Engine)...
-start "ECO_BACKEND_SERVICE" /min cmd /c "cd /d "%BASEDIR%" && backend\venv\Scripts\python -m uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 > "%BASEDIR%eco_backend.log" 2>&1"
+start "ECO_BACKEND_SERVICE" /min cmd /c "backend\venv\Scripts\python -m uvicorn backend.api.main:app --host 0.0.0.0 --port 8000"
 
 :: 4. Start Frontend
 echo [*] Avvio Interfaccia...

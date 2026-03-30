@@ -185,14 +185,8 @@ function App() {
       } else {
         setApiKeyError(r.data.error || 'Errore');
       }
-    } catch (err: any) {
-      if (err.code === 'ECONNABORTED' || err.message?.includes('Network Error')) {
-        // This might just be a brief flicker. If we're here, it's possible the save worked.
-        // We check the status after a small delay.
-        setTimeout(fetchSettings, 2000);
-      } else {
-        setApiKeyError('Errore di connessione. Verifica che il server sia attivo.');
-      }
+    } catch {
+      setApiKeyError('Backend non raggiungibile. Riavvia run_eco.bat e riprova.');
     }
     finally { setApiKeySaving(false); }
   };

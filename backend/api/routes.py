@@ -69,7 +69,7 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
         raise HTTPException(status_code=500, detail=f"Errore durante l'upload: {str(e)}")
 
 @router.post("/upload-batch")
-async def upload_batch(files: List[UploadFile] = File(...), case_id: Optional[str] = None, db: Session = Depends(get_db)):
+def upload_batch(files: List[UploadFile] = File(...), case_id: Optional[str] = None, db: Session = Depends(get_db)):
     # If case_id is present, get the case once
     from backend.db.models import Case
     case = db.query(Case).filter_by(id=case_id).first() if case_id else None
@@ -82,7 +82,8 @@ async def upload_batch(files: List[UploadFile] = File(...), case_id: Optional[st
         doc_id = str(uuid.uuid4())
         minio_path = f"{doc_id}_{file.filename}"
         try:
-            data = await file.read()
+            # Sync read to prevent event loop blocking in threadpool
+            data = file.file.read()
             minio_client.put_object("documents", minio_path, io.BytesIO(data), length=len(data))
             new_doc = Document(
                 id=doc_id,

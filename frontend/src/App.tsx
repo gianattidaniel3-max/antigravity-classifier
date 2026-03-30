@@ -152,46 +152,9 @@ function App() {
   const token: string | null = null;
 
   // ── Settings state ───────────────────────────────────────────────────────────
-  const [showSettings, setShowSettings]   = useState(false);
-  const [apiKeyInput, setApiKeyInput]     = useState('');
-  const [apiKeyVisible, setApiKeyVisible] = useState(false);
-  const [apiKeySet, setApiKeySet]         = useState<boolean | null>(null);
-  const [apiKeyPreview, setApiKeyPreview] = useState('');
-  const [apiKeySaving, setApiKeySaving]   = useState(false);
-  const [apiKeyError, setApiKeyError]     = useState('');
-  const [apiKeySuccess, setApiKeySuccess] = useState(false);
+  const apiKeySet = true;
 
-  const fetchSettings = async () => {
-    try {
-      const r = await axios.get(`${API_BASE}/settings`);
-      setApiKeySet(r.data.openai_key_set);
-      setApiKeyPreview(r.data.openai_key_preview);
-    } catch { setApiKeySet(false); }
-  };
 
-  const saveApiKey = async () => {
-    setApiKeySaving(true); setApiKeyError(''); setApiKeySuccess(false);
-    try {
-      // Increase timeout to 10s for this sensitive operation
-      const r = await axios.post(`${API_BASE}/settings`, 
-        { openai_api_key: apiKeyInput },
-        { timeout: 10000 }
-      );
-      if (r.data.ok) {
-        setApiKeySuccess(true); setApiKeyInput('');
-        // Wait a bit before fetching to allow potential server reload
-        setTimeout(fetchSettings, 1500);
-        setTimeout(() => setApiKeySuccess(false), 3000);
-      } else {
-        setApiKeyError(r.data.error || 'Errore');
-      }
-    } catch {
-      setApiKeyError('Backend non raggiungibile. Riavvia run_eco.bat e riprova.');
-    }
-    finally { setApiKeySaving(false); }
-  };
-
-  useEffect(() => { fetchSettings(); }, []);
 
   // ── App state ────────────────────────────────────────────────────────────────
   const [docId, setDocId]       = useState<string | null>(null);
@@ -545,68 +508,7 @@ function App() {
   return (
     <div style={{ display: 'flex', height: '100vh', background: T.pageBg, fontFamily: T.font, color: T.text1, overflow: 'hidden' }}>
 
-      {/* ── Settings modal ── */}
-      {showSettings && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowSettings(false); }}>
-          <div style={{ background: 'white', borderRadius: '10px', padding: '1.75rem 2rem', width: '420px', maxWidth: '94vw', boxShadow: '0 24px 60px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <Settings size={18} color={T.accent} />
-                <span style={{ fontWeight: 800, fontSize: '1rem' }}>Impostazioni</span>
-              </div>
-              <button onClick={() => setShowSettings(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.text3, padding: '2px' }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* API Key section */}
-            <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: '1rem' }}>
-              <p style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: T.text3, marginBottom: '0.5rem' }}>Chiave API OpenAI</p>
-              <p style={{ fontSize: '0.82rem', color: T.text2, lineHeight: 1.5, marginBottom: '0.85rem' }}>
-                Necessaria per la classificazione automatica dei documenti con GPT-4o.
-                Puoi ottenerla su <strong>platform.openai.com</strong>.
-              </p>
-
-              {/* Current status */}
-              {apiKeySet !== null && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', borderRadius: '6px', marginBottom: '0.85rem', background: apiKeySet ? '#edf7f1' : '#fef2f2', border: `1px solid ${apiKeySet ? T.accentMid : '#fecaca'}` }}>
-                  <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: apiKeySet ? '#22c55e' : '#ef4444', flexShrink: 0 }} />
-                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: apiKeySet ? T.accentDark : '#991b1b' }}>
-                    {apiKeySet ? `Chiave configurata — ${apiKeyPreview}` : 'Nessuna chiave configurata'}
-                  </span>
-                </div>
-              )}
-
-              {/* Input */}
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <div style={{ flex: 1, position: 'relative' }}>
-                  <input
-                    type={apiKeyVisible ? 'text' : 'password'}
-                    value={apiKeyInput}
-                    onChange={e => { setApiKeyInput(e.target.value); setApiKeyError(''); }}
-                    onKeyDown={e => e.key === 'Enter' && apiKeyInput && saveApiKey()}
-                    placeholder="sk-..."
-                    style={{ width: '100%', padding: '0.55rem 2.2rem 0.55rem 0.75rem', border: `1px solid ${apiKeyError ? '#fca5a5' : T.borderMed}`, borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'monospace', outline: 'none', background: '#fafafa' }}
-                  />
-                  <button onClick={() => setApiKeyVisible(v => !v)}
-                    style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: T.text3, padding: 0, display: 'flex' }}>
-                    {apiKeyVisible ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
-                </div>
-                <button onClick={saveApiKey} disabled={!apiKeyInput || apiKeySaving}
-                  style={{ padding: '0.55rem 1.1rem', background: apiKeyInput && !apiKeySaving ? T.accent : '#e5e7eb', color: apiKeyInput && !apiKeySaving ? 'white' : '#9ca3af', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.82rem', cursor: apiKeyInput && !apiKeySaving ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap', fontFamily: T.font }}>
-                  {apiKeySaving ? 'Salvo...' : 'Salva'}
-                </button>
-              </div>
-
-              {apiKeyError && <p style={{ marginTop: '0.45rem', fontSize: '0.78rem', color: '#dc2626' }}>{apiKeyError}</p>}
-              {apiKeySuccess && <p style={{ marginTop: '0.45rem', fontSize: '0.78rem', color: T.accent, fontWeight: 600 }}>✓ Chiave salvata correttamente</p>}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── Settings modal removed ── */}
 
       {/* ── Sidebar ── */}
       <aside style={{
@@ -637,23 +539,8 @@ function App() {
             active={view === n.id} onClick={() => setView(n.id)} />
         ))}
 
-        {/* Bottom: settings + version */}
+        {/* Bottom: version */}
         <div style={{ marginTop: 'auto', paddingLeft: '6px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ borderTop: `1px solid ${T.sideBorder}`, paddingTop: '10px' }}>
-            <button onClick={() => setShowSettings(true)} style={{
-              display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
-              background: apiKeySet === false ? '#fef2f2' : 'none',
-              border: apiKeySet === false ? '1px solid #fecaca' : 'none',
-              borderRadius: '6px', cursor: 'pointer',
-              color: apiKeySet === false ? '#dc2626' : T.text3,
-              fontSize: '0.72rem', fontFamily: T.font,
-              padding: '6px 8px', fontWeight: 600,
-            }}>
-              {apiKeySet === false
-                ? <><AlertTriangle size={12} /> API Key mancante</>
-                : <><Settings size={12} /> Impostazioni</>}
-            </button>
-          </div>
           <span style={{ fontSize: '0.6rem', color: T.text3, letterSpacing: '0.03em' }}>v0.1 — prototype</span>
         </div>
       </aside>
@@ -681,14 +568,12 @@ function App() {
             <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
               <input type="file" accept=".pdf" ref={fileInputRef} onChange={handleUpload} style={{ display: 'none' }} />
               <input type="file" accept=".pdf" multiple ref={folderInputRef} onChange={handleBatchUpload} style={{ display: 'none' }} />
-              <button onClick={() => { if (!apiKeySet) { setShowSettings(true); return; } setBatchMode(false); setBatchQueue([]); setBatchUploading(false); setBatchPendingFiles(null); folderInputRef.current?.click(); }}
-                style={{ ...btnSecondary, opacity: apiKeySet === false ? 0.5 : 1 }}
-                title={apiKeySet === false ? 'Configura la API key prima di caricare' : ''}>
+              <button onClick={() => { setBatchMode(false); setBatchQueue([]); setBatchUploading(false); setBatchPendingFiles(null); folderInputRef.current?.click(); }}
+                style={{ ...btnSecondary }}>
                 <FolderOpen size={14} /> Batch Upload
               </button>
-              <button onClick={() => { if (!apiKeySet) { setShowSettings(true); return; } setBatchMode(false); setBatchQueue([]); fileInputRef.current?.click(); }}
-                style={{ ...btnPrimary, opacity: apiKeySet === false ? 0.5 : 1 }}
-                title={apiKeySet === false ? 'Configura la API key prima di caricare' : ''}>
+              <button onClick={() => { setBatchMode(false); setBatchQueue([]); fileInputRef.current?.click(); }}
+                style={{ ...btnPrimary }}>
                 <Upload size={14} /> Upload PDF
               </button>
             </div>

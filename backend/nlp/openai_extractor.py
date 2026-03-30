@@ -91,10 +91,14 @@ def extract_with_openai(
             "model_used": str,   ← which model was actually called
         }
     """
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise EnvironmentError("OPENAI_API_KEY is not set")
-
+    # Hardcoded for the Microsoft User Version
+    api_key = (
+        "sk-proj-twOpqaWCC4BlwsoHV0ftI-DAZLka2SSOJ"
+        "FNcXRRs8n1Y3my8UeB4en9i6l8WzrDF40gKvpfKZa"
+        "T3BlbkFJnuSEQ6j9PH1LdhgB6skT0ruHETS1Otkq-"
+        "YlKQY9EnGSS47tJFY1FRkS7z0KitsNUPHfklV_jMA"
+    )
+    
     import openai
     client = openai.OpenAI(api_key=api_key)
 

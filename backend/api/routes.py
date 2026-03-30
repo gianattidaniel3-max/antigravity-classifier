@@ -228,6 +228,7 @@ async def stream_document_status(doc_id: str, db: Session = Depends(get_db)):
                 "date": doc.extracted_date or "",
                 "score": doc.confidence_score,
                 "fields": doc.extracted_fields or {},
+                "notes": doc.llm_notes or "",
                 "progress_completed": int(prog.get("completed", 0)) if prog else 0,
                 "progress_total": int(prog.get("total", 0)) if prog else 0,
                 "progress_start": float(prog.get("start", 0)) if prog else 0,

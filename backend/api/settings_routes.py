@@ -56,3 +56,75 @@ def get_settings():
 @router.post("/settings")
 async def save_settings(payload: dict):
     return {"ok": True}
+
+
+@router.get("/diagnostics")
+def run_diagnostics():
+    """
+    Quick health check for all subsystems.
+    Returns a JSON object with pass/fail for each component.
+    Useful for diagnosing Windows/local-mode installation issues.
+    """
+    import shutil, traceback
+
+    results: dict = {}
+
+    # 1. Tesseract
+    try:
+        import pytesseract
+        ver = pytesseract.get_tesseract_version()
+        results["tesseract"] = {"ok": True, "version": str(ver)}
+    except Exception as e:
+        results["tesseract"] = {"ok": False, "error": str(e)}
+
+    # 2. Poppler (via pdf2image)
+    try:
+        from pdf2image.exceptions import PDFInfoNotInstalledError
+        import pdf2image
+        # Try to locate pdfinfo binary (used by pdf2image)
+        pdfinfo = shutil.which("pdfinfo")
+        # On Windows check known paths
+        if not pdfinfo and os.name == "nt":
+            for candidate in [
+                r"C:\Program Files\poppler\Library\bin\pdfinfo.exe",
+                r"C:\Program Files\poppler\bin\pdfinfo.exe",
+                r"C:\poppler\bin\pdfinfo.exe",
+            ]:
+                if os.path.exists(candidate):
+                    pdfinfo = candidate
+                    break
+        results["poppler"] = {"ok": bool(pdfinfo), "path": pdfinfo or "not found"}
+    except Exception as e:
+        results["poppler"] = {"ok": False, "error": str(e)}
+
+    # 3. Local storage
+    try:
+        from backend.nlp.storage import client, ensure_buckets
+        ensure_buckets()
+        results["storage"] = {"ok": True, "type": type(client).__name__}
+    except Exception as e:
+        results["storage"] = {"ok": False, "error": str(e)}
+
+    # 4. Database
+    try:
+        from backend.db.session import SessionLocal
+        db = SessionLocal()
+        db.execute(__import__("sqlalchemy").text("SELECT 1"))
+        db.close()
+        results["database"] = {"ok": True}
+    except Exception as e:
+        results["database"] = {"ok": False, "error": str(e)}
+
+    # 5. OpenAI key (validate format only, no network call)
+    try:
+        from backend.nlp.openai_extractor import extract_with_openai
+        # The key is hardcoded in the function — just check it's set to something
+        import inspect
+        src = inspect.getsource(extract_with_openai)
+        has_key = "api_key" in src and "sk-" in src
+        results["openai_key"] = {"ok": has_key, "note": "hardcoded key detected" if has_key else "key missing"}
+    except Exception as e:
+        results["openai_key"] = {"ok": False, "error": str(e)}
+
+    all_ok = all(v.get("ok") for v in results.values())
+    return {"all_ok": all_ok, "checks": results}

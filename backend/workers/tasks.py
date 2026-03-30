@@ -281,11 +281,21 @@ def process_document(self, document_id: str):
         db.commit()
 
     except Exception as e:
-        print(f"Error processing {document_id}: {e}")
-        doc = db.query(Document).filter(Document.id == document_id).first()
-        if doc:
-            doc.status = DocumentStatus.FAILED
-            db.commit()
-        raise self.retry(exc=e, countdown=60)
+        import traceback
+        tb = traceback.format_exc()
+        print(f"ERROR processing {document_id}: {e}\n{tb}")
+        try:
+            doc = db.query(Document).filter(Document.id == document_id).first()
+            if doc:
+                doc.status = DocumentStatus.FAILED
+                # Store the error reason so the frontend can display it
+                doc.llm_notes = f"Errore: {type(e).__name__}: {str(e)[:500]}"
+                db.commit()
+        except Exception as db_err:
+            print(f"ERROR writing FAILED status: {db_err}")
+        # In local/Windows mode self.retry() just re-raises and kills the daemon
+        # thread — skip it and let the thread exit cleanly.
+        if hasattr(self, '_is_real_celery'):
+            raise self.retry(exc=e, countdown=60)
     finally:
         db.close()

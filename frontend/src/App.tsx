@@ -170,6 +170,7 @@ function App() {
   const [pagesTotal, setPagesTotal]         = useState<number>(0);
   const [procStart, setProcStart]           = useState<number>(0);
   const [ocrOpen, setOcrOpen]               = useState<boolean>(false);
+  const [errorNote, setErrorNote]           = useState<string>('');
   const [batchQueue, setBatchQueue]         = useState<Array<{ filename: string; docId: string; status: string }>>([]);
   const [batchMode, setBatchMode]           = useState<boolean>(false);
   const [batchUploading, setBatchUploading] = useState<boolean>(false);
@@ -241,6 +242,7 @@ function App() {
       if (data.progress_total)    setPagesTotal(data.progress_total);
       if (data.progress_completed !== undefined) setPagesCompleted(data.progress_completed);
       if (data.progress_start && procStart === 0) setProcStart(data.progress_start * 1000);
+      if (data.notes) setErrorNote(data.notes);
       if (['needs_review', 'verified', 'failed'].includes(data.status)) {
         source.close();
         setStartTime(Date.now());
@@ -267,7 +269,7 @@ function App() {
 
   const resetState = () => {
     setStatus('idle'); setLabel(''); setCategory(''); setDate('');
-    setScore(''); setOcrText(''); setFields({});
+    setScore(''); setOcrText(''); setFields({}); setErrorNote('');
     setPagesCompleted(0); setPagesTotal(0); setProcStart(0);
   };
 
@@ -1078,6 +1080,18 @@ function App() {
                             </div>
                           </>
                         )}
+                      </div>
+                    )}
+
+                    {/* Error detail — only shown when status is failed */}
+                    {status === 'failed' && (
+                      <div style={{ padding: '12px 14px', borderRadius: T.radius, background: '#fef2f2', border: '1px solid #fecaca' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#991b1b', marginBottom: '4px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                          ⚠ Errore di elaborazione
+                        </div>
+                        <div style={{ fontSize: '0.76rem', color: '#7f1d1d', fontFamily: 'monospace', wordBreak: 'break-word' }}>
+                          {errorNote || 'Errore sconosciuto. Controllare i log del backend.'}
+                        </div>
                       </div>
                     )}
 

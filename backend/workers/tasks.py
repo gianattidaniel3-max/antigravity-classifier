@@ -162,9 +162,14 @@ def process_document(self, document_id: str):
         total_pages = len(PdfReader(io.BytesIO(pdf_bytes)).pages)
 
         tess_config = "--psm 3 --oem 1 --dpi 120"
-        if os.path.exists(LOCAL_TESSDATA):
+        # Only override TESSDATA_PREFIX if the local folder actually contains the Italian model
+        if os.path.exists(os.path.join(LOCAL_TESSDATA, "ita.traineddata")):
             os.environ["TESSDATA_PREFIX"] = LOCAL_TESSDATA
             tess_config += f' --tessdata-dir "{LOCAL_TESSDATA}"'
+        else:
+            # Clear it if it's pointing to our broken internal dir
+            if os.environ.get("TESSDATA_PREFIX") == LOCAL_TESSDATA:
+                del os.environ["TESSDATA_PREFIX"]
 
         prog_key = f"progress:{document_id}"
         _redis.hset(prog_key, mapping={

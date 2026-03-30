@@ -37,6 +37,24 @@ if (!(Get-Command tesseract -ErrorAction SilentlyContinue)) {
     Write-Host "OK Tesseract trovato." -ForegroundColor Green
 }
 
+# Scarica modello lingua Italiana se mancante
+$itaUrl = "https://github.com/tesseract-ocr/tessdata/raw/main/ita.traineddata"
+$sysTessPath = "C:\Program Files\Tesseract-OCR\tessdata\ita.traineddata"
+$localTessPath = "$PSScriptRoot\backend\resources\tessdata\ita.traineddata"
+
+if (!(Test-Path $sysTessPath) -and !(Test-Path $localTessPath)) {
+    Write-Host "Modello lingua Italiana (ita) mancante. Scaricamento in corso..." -ForegroundColor Yellow
+    if (!(Test-Path (Split-Path $localTessPath))) { New-Item -ItemType Directory -Path (Split-Path $localTessPath) -Force }
+    try {
+        Invoke-WebRequest -Uri $itaUrl -OutFile $localTessPath -ErrorAction Stop
+        Write-Host "OK Modello Italiano scaricato in: $localTessPath" -ForegroundColor Green
+    } catch {
+        Write-Host "ERRORE nello scaricamento del modello Italiano. Scaricalo manualmente da: $itaUrl" -ForegroundColor Red
+    }
+} else {
+    Write-Host "OK Modello lingua Italiana trovato." -ForegroundColor Green
+}
+
 # 4. Verifica/Installazione Poppler (necessario per pdf2image)
 if (!(Get-Command pdftoppm -ErrorAction SilentlyContinue)) {
     Write-Host "Poppler non trovato. Installazione in corso via winget..." -ForegroundColor Yellow

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
 import {
   FileSearch, Upload, CheckCircle, FolderOpen, ChevronRight, ChevronLeft,
-  Tag, Layers, Scale, Files, BarChart2, Settings, Eye, EyeOff, X, AlertTriangle,
+  Tag, Layers, Scale, Files, BarChart2,
 } from 'lucide-react';
 import axios from 'axios';
 import TaxonomyPanel from './TaxonomyPanel';
@@ -291,7 +291,6 @@ function App() {
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
-    if (!apiKeySet) { setShowSettings(true); e.target.value = ''; return; }
     resetState();
     const formData = new FormData();
     formData.append('file', e.target.files[0]);
@@ -310,7 +309,6 @@ function App() {
   // Step 1: files selected → show confirmation form
   const handleBatchUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
-    if (!apiKeySet) { setShowSettings(true); e.target.value = ''; return; }
     const pdfs = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
     if (!pdfs.length) return;
     setBatchPendingFiles(pdfs);

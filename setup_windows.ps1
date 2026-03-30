@@ -2,6 +2,7 @@
 # Questo script configura Python, Node.js e Ollama per far girare ECO senza Docker.
 
 $ErrorActionPreference = "Stop"
+Set-Location $PSScriptRoot
 
 # Helper: ricarica il PATH dalla registry cosi' i programmi appena installati sono trovati
 function Refresh-Path {

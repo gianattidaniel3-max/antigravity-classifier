@@ -1,13 +1,19 @@
 import re
-import spacy
 import difflib
 from typing import Optional
 
 # Global SpaCy instance (loaded once, optimized)
-try:
-    _nlp = spacy.load("it_core_news_lg", disable=["tagger", "parser", "attribute_ruler", "lemmatizer"])
-except:
-    _nlp = None
+_nlp = None
+
+def _get_nlp():
+    global _nlp
+    if _nlp is None:
+        try:
+            import spacy
+            _nlp = spacy.load("it_core_news_lg", disable=["tagger", "parser", "attribute_ruler", "lemmatizer"])
+        except (ImportError, Exception):
+            return None
+    return _nlp
 
 # Italian month names and abbreviations → zero-padded numeric strings.
 _MONTHS_IT: dict[str, str] = {
@@ -121,8 +127,9 @@ def extract_date(text: str) -> Optional[str]:
             return f"{d}/{m_val}/{y}"
 
     # Step 2: SPA-CY NER (Contextual discovery)
-    if _nlp:
-        doc = _nlp(text[:1200])
+    nlp = _get_nlp()
+    if nlp:
+        doc = nlp(text[:1200])
         for ent in doc.ents:
             if ent.label_ == "DATE":
                 # Run the permissive regex on the found entity

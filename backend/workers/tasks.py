@@ -13,6 +13,17 @@ from concurrent.futures import ThreadPoolExecutor
 
 celery_app = Celery("document_worker", broker=os.getenv("REDIS_URL", "redis://localhost:6379/0"))
 
+# ── Redis Fallback / Local Mode ─────────────────────────────────────────────
+import redis as redis_lib
+try:
+    _r = redis_lib.Redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379/0"))
+    _r.ping()
+    print("Celery: Using Redis broker.")
+except Exception:
+    print("Celery: Redis not reachable. Switching to Synchronous LOCAL MODE (eager).")
+    celery_app.conf.task_always_eager = True
+    celery_app.conf.task_eager_propagates = True
+
 # Constants for Vision processing
 _VISION_DPI = 150
 

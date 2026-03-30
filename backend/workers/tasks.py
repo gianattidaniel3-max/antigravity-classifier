@@ -162,12 +162,24 @@ def process_document(self, document_id: str):
         total_pages = len(PdfReader(io.BytesIO(pdf_bytes)).pages)
 
         tess_config = "--psm 3 --oem 1 --dpi 120"
-        # Only override TESSDATA_PREFIX if the local folder actually contains the Italian model
+        
+        # 1. Search for a valid 'ita.traineddata' location
+        valid_tessdata = None
+        # Priority 1: Local project resources
         if os.path.exists(os.path.join(LOCAL_TESSDATA, "ita.traineddata")):
-            os.environ["TESSDATA_PREFIX"] = LOCAL_TESSDATA
-            tess_config += f' --tessdata-dir "{LOCAL_TESSDATA}"'
+            valid_tessdata = LOCAL_TESSDATA
+        # Priority 2: System Tesseract (Windows)
+        elif os.name == "nt":
+            sys_tess = r"C:\Program Files\Tesseract-OCR\tessdata"
+            if os.path.exists(os.path.join(sys_tess, "ita.traineddata")):
+                valid_tessdata = sys_tess
+
+        # 2. Setup the configuration
+        if valid_tessdata:
+            os.environ["TESSDATA_PREFIX"] = valid_tessdata
+            tess_config += f' --tessdata-dir "{valid_tessdata}"'
         else:
-            # Clear it if it's pointing to our broken internal dir
+            # Fallback for systems where Tesseract is in PATH and can find its own files
             if os.environ.get("TESSDATA_PREFIX") == LOCAL_TESSDATA:
                 del os.environ["TESSDATA_PREFIX"]
 

@@ -97,28 +97,42 @@ _BATCH_SIZE = 4
 # 150 DPI → ~1240×1754 px for A4 (well within GPT-4o 2048-px limit).
 _VISION_DPI = 150
 
-# ── Windows: set explicit binary paths for Tesseract and Poppler ─────────────
+# ── Binary detection: Tesseract and Poppler ────────────────────────────────────
 _POPPLER_PATH = None
-if os.name == "nt":
-    import pytesseract as _pyt
-    _TESS_CANDIDATES = [
+
+# 1. Tesseract detection
+import pytesseract as _pyt
+import shutil
+_T_PATH = os.getenv("TESSERACT_PATH") or shutil.which("tesseract")
+if not _T_PATH:
+    _T_CANDS = [
         r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+        "/opt/homebrew/bin/tesseract",
+        "/usr/local/bin/tesseract"
     ]
-    for _p in _TESS_CANDIDATES:
+    for _p in _T_CANDS:
         if os.path.exists(_p):
-            _pyt.pytesseract.tesseract_cmd = _p
+            _T_PATH = _p
             break
 
-    _POPPLER_CANDIDATES = [
+if _T_PATH:
+    _pyt.pytesseract.tesseract_cmd = _T_PATH
+
+# 2. Poppler detection
+_P_PATH = os.getenv("POPPLER_PATH") or shutil.which("pdfinfo")
+if _P_PATH:
+    # If we found pdfinfo, we want the directory containing it
+    _POPPLER_PATH = os.path.dirname(_P_PATH)
+else:
+    _P_CANDS = [
         r"C:\Program Files\poppler\Library\bin",
         r"C:\Program Files\poppler\bin",
-        r"C:\poppler\bin",
+        "/opt/homebrew/bin",
+        "/usr/local/bin"
     ]
-    for _p in _POPPLER_CANDIDATES:
-        if os.path.exists(_p):
-            _POPPLER_PATH = _p
-            break
+    for _p in _P_CANDS:
+        if os.path.exists(os.path.join(_p, "pdfinfo.exe" if os.name=="nt" else "pdfinfo")):
+            _POPPLER_PATH = _p; break
 
 
 @celery_app.task(bind=True, max_retries=3)

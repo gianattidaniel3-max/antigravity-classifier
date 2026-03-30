@@ -72,27 +72,40 @@ def run_diagnostics():
     # 1. Tesseract
     try:
         import pytesseract
+        # Try to find version
         ver = pytesseract.get_tesseract_version()
-        results["tesseract"] = {"ok": True, "version": str(ver)}
+        # Also check path
+        t_path = shutil.which("tesseract")
+        if not t_path and os.path.exists("/opt/homebrew/bin/tesseract"):
+            t_path = "/opt/homebrew/bin/tesseract"
+        results["tesseract"] = {"ok": True, "version": str(ver), "path": t_path}
     except Exception as e:
         results["tesseract"] = {"ok": False, "error": str(e)}
 
     # 2. Poppler (via pdf2image)
     try:
-        from pdf2image.exceptions import PDFInfoNotInstalledError
         import pdf2image
-        # Try to locate pdfinfo binary (used by pdf2image)
         pdfinfo = shutil.which("pdfinfo")
         # On Windows check known paths
-        if not pdfinfo and os.name == "nt":
-            for candidate in [
-                r"C:\Program Files\poppler\Library\bin\pdfinfo.exe",
-                r"C:\Program Files\poppler\bin\pdfinfo.exe",
-                r"C:\poppler\bin\pdfinfo.exe",
-            ]:
-                if os.path.exists(candidate):
-                    pdfinfo = candidate
-                    break
+        if not pdfinfo:
+            if os.name == "nt":
+                for candidate in [
+                    r"C:\Program Files\poppler\Library\bin\pdfinfo.exe",
+                    r"C:\Program Files\poppler\bin\pdfinfo.exe",
+                    r"C:\poppler\bin\pdfinfo.exe",
+                ]:
+                    if os.path.exists(candidate):
+                        pdfinfo = candidate
+                        break
+            else:
+                # Mac Homebrew fallback
+                for candidate in [
+                    "/opt/homebrew/bin/pdfinfo",
+                    "/usr/local/bin/pdfinfo",
+                ]:
+                    if os.path.exists(candidate):
+                        pdfinfo = candidate
+                        break
         results["poppler"] = {"ok": bool(pdfinfo), "path": pdfinfo or "not found"}
     except Exception as e:
         results["poppler"] = {"ok": False, "error": str(e)}
@@ -127,4 +140,23 @@ def run_diagnostics():
         results["openai_key"] = {"ok": False, "error": str(e)}
 
     all_ok = all(v.get("ok") for v in results.values())
-    return {"all_ok": all_ok, "checks": results}
+    
+    # Add manual fix instructions if things are broken
+    remediation = []
+    if not results.get("tesseract", {}).get("ok"):
+        if os.name == "nt":
+            remediation.append("Tesseract missing. Run: winget install UB.TesseractOCR")
+        else:
+            remediation.append("Tesseract missing. Run: brew install tesseract")
+            
+    if not results.get("poppler", {}).get("ok"):
+        if os.name == "nt":
+            remediation.append("Poppler missing. Run: winget install oschwartz10612.Poppler")
+        else:
+            remediation.append("Poppler missing. Run: brew install poppler")
+
+    return {
+        "all_ok": all_ok, 
+        "checks": results,
+        "remediation": remediation if not all_ok else None
+    }

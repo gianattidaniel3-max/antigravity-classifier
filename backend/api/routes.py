@@ -38,11 +38,11 @@ router = APIRouter()
 
 @router.post("/upload")
 async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    ensure_buckets()
-    doc_id = str(uuid.uuid4())
-    minio_path = f"{doc_id}_{file.filename}"
-
     try:
+        ensure_buckets()
+        doc_id = str(uuid.uuid4())
+        minio_path = f"{doc_id}_{file.filename}"
+
         # Since we use minio client without a fixed size stream, upload via file.read() for prototyping
         data = await file.read()
         import io
@@ -63,13 +63,13 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
         
         return {"document_id": doc_id, "status": "processing_started"}
     except Exception as e:
+        import traceback
+        print(f"UPLOAD ERROR: {e}\n{traceback.format_exc()}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Errore durante l'upload: {str(e)}")
 
 @router.post("/upload-batch")
 async def upload_batch(files: List[UploadFile] = File(...), case_id: Optional[str] = None, db: Session = Depends(get_db)):
-    ensure_buckets()
-    results = []
     # If case_id is present, get the case once
     from backend.db.models import Case
     case = db.query(Case).filter_by(id=case_id).first() if case_id else None

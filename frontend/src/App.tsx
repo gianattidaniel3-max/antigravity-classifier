@@ -292,18 +292,23 @@ function App() {
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.length) return;
-    resetState();
-    const formData = new FormData();
-    formData.append('file', e.target.files[0]);
     try {
+      if (!e.target.files?.length) return;
+      const file = e.target.files[0];
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      resetState();
+      setErrorNote('');
       setStatus('uploading...');
       const res = await axios.post(`${API_BASE}/upload`, formData);
       setDocId(res.data.document_id);
     } catch (err: any) {
-      const msg = err?.response?.data?.detail;
+      console.error('Upload failed:', err);
+      const msg = err?.response?.data?.detail || err.message || 'Errore di rete o del server';
       setStatus('failed');
-      if (msg) alert(msg);
+      setErrorNote(msg);
+      alert(`Upload fallito: ${msg}`);
     }
     e.target.value = '';
   };
@@ -353,6 +358,11 @@ function App() {
       }));
       setBatchQueue(prev => [...prev, ...items]);
       _subscribeItems(items);
+    } catch (err: any) {
+      console.error('Batch upload error:', err);
+      const msg = err?.response?.data?.detail || err.message;
+      setErrorNote(msg);
+      alert(`Batch upload fallito: ${msg}`);
     } finally {
       setBatchUploading(false); setUploadPhase('idle');
     }

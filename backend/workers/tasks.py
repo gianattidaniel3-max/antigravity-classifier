@@ -184,23 +184,24 @@ def process_document(self, document_id: str):
                  print(f"DEBUG: Successfully downloaded {ita_filename} to {ita_local_path}")
              except Exception as down_err:
                  print(f"DEBUG: Download failed: {down_err}")
-                 # We still try to proceed, maybe the system Tesseract has it.
-
+        
         # 2. Pick the best tessdata folder
         valid_tessdata = None
+        from pathlib import Path
         if _is_valid(LOCAL_TESSDATA):
-            valid_tessdata = LOCAL_TESSDATA
+            valid_tessdata = Path(LOCAL_TESSDATA)
         elif os.name == "nt":
-            sys_tess = r"C:\Program Files\Tesseract-OCR\tessdata"
+            sys_tess = Path(r"C:\Program Files\Tesseract-OCR\tessdata")
             if _is_valid(sys_tess):
                 valid_tessdata = sys_tess
 
-        # 3. Apply flag (avoid TESSDATA_PREFIX on Windows)
+        # 3. Apply flag
         if valid_tessdata:
+            # On Windows, enforce Path handling to get clean backslashes
             tess_config += f' --tessdata-dir "{valid_tessdata}"'
         
         # Clear legacy env var if set to our local dir to avoid Tesseract internal confusion
-        if os.environ.get("TESSDATA_PREFIX") == LOCAL_TESSDATA:
+        if os.environ.get("TESSDATA_PREFIX") == str(LOCAL_TESSDATA):
             del os.environ["TESSDATA_PREFIX"]
 
         prog_key = f"progress:{document_id}"

@@ -98,22 +98,20 @@ _BATCH_SIZE = 4
 _VISION_DPI = 150
 
 # ── Binary detection: Tesseract and Poppler ────────────────────────────────────
-_POPPLER_PATH = None
-
-# 1. Tesseract detection
 import pytesseract as _pyt
 import shutil
 _T_PATH = os.getenv("TESSERACT_PATH") or shutil.which("tesseract")
 if not _T_PATH:
     _T_CANDS = [
         r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+        r"C:\Tesseract-OCR\tesseract.exe",
         "/opt/homebrew/bin/tesseract",
         "/usr/local/bin/tesseract"
     ]
     for _p in _T_CANDS:
         if os.path.exists(_p):
-            _T_PATH = _p
-            break
+            _T_PATH = _p; break
 
 if _T_PATH:
     _pyt.pytesseract.tesseract_cmd = _T_PATH

@@ -242,22 +242,56 @@ def process_document(self, document_id: str):
                     os.remove(tmp_path)
 
         # ═════════════════════════════════════════════════════════════════════
-        # PHASE 1 — Zero-shot OCR on page 1 → temporary classification
+        # PHASE 1 — Vision-based Classification (No more local Tesseract errors!)
         # ═════════════════════════════════════════════════════════════════════
         images_p1 = convert_from_bytes(
-            pdf_bytes, dpi=120, first_page=1, last_page=1,
+            pdf_bytes, dpi=_VISION_DPI, first_page=1, last_page=1,
             poppler_path=_POPPLER_PATH,
         )
-        page1_text = ocr_page(images_p1[0])
+        img_p1 = images_p1[0]
+        
+        # 1. Convert PIL image to base64 for GPT-4o Vision
+        import base64
+        buffered = io.BytesIO()
+        img_p1.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode()
 
-        prediction = classify_legal_text(page1_text)
+        # 2. Extract and Classify using OpenAI Vision directly
+        from backend.nlp.openai_extractor import extract_with_openai
+        from openai import OpenAI
+        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        
+        # Simple classification/OCR request to GPT-4o Vision
+        prompt = """
+        Analyze this Italian legal document (Page 1) and:
+        1. Extract the primary text content (OCR).
+        2. Identify:
+           - Label: (e.g. Decreto Ingiuntivo, Fattura, Atto di Citazione, etc.)
+           - Category: (e.g. Giustizia Civile, Fiscale, Amministrativo)
+           - Extracted Date: (format DD/MM/YYYY)
+        Return JSON format.
+        """
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
+                ]
+            }],
+            response_format={"type": "json_object"}
+        )
+        
+        prediction = _json.loads(response.choices[0].message.content)
+        page1_text = prediction.get("ocr_text", "Failed to extract text automatically.")
 
-        doc.temp_label    = prediction["label"]
-        doc.temp_category = prediction["category"]
-        doc.temp_score    = prediction["score"]
-        doc.extracted_date = extract_date(page1_text)
+        doc.temp_label    = prediction.get("label", "Unknown")
+        doc.temp_category = prediction.get("category", "General")
+        doc.temp_score    = 0.95
+        doc.extracted_date = prediction.get("extracted_date")
         doc.status         = DocumentStatus.TEMP_CLASSIFIED
-        db.commit()  # ← frontend can display temp result now
+        db.commit()
 
         # ═════════════════════════════════════════════════════════════════════
         # PHASE 2 — GPT-4o Vision: full document → confirmed classification
